@@ -66,6 +66,31 @@ One-click launch for AI coding agents directly from the toolbar:
 - **ROS2 submenu**: nodes, topics, services, doctor, TF tree, topic Hz
 - **Launch Agent submenu**: Claude Code, Codex
 
+### CLI Tools (14 commands)
+Add to your `~/.bashrc` or `~/.zshrc`:
+```bash
+# Auto-source ROBOTERM tools when running inside ROBOTERM
+[ -n "$ROBOTERM" ] && [ -f "$ROBOTERM_TOOLS" ] && source "$ROBOTERM_TOOLS"
+```
+
+Then use `rt` commands:
+```
+rt init        — Auto-detect & source ROS2 workspace
+rt nodes       — Live node dashboard
+rt topics      — Topic monitor with types
+rt services    — Service list with types
+rt params      — Parameter browser
+rt doctor      — System diagnostics (ROS2, DDS, Docker, hardware)
+rt tf          — Transform tree (view_frames, echo, monitor)
+rt build       — Smart colcon build with auto-source
+rt bag         — Bag management (list, info, record, play)
+rt hz          — Topic frequency monitor
+rt echo        — Pretty topic echo
+rt launch      — Enhanced ros2 launch
+rt dds         — DDS configuration & diagnostics
+rt docker      — Docker helpers (ps, up, down, logs, shell)
+```
+
 ### Status Bar
 Live system info with zero overhead:
 - CPU/MEM via mach APIs (no subprocess spawning)
