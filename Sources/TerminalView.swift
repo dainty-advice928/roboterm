@@ -55,6 +55,7 @@ class RobotermTerminal: LocalProcessTerminalView {
         processDelegate = delegate
 
         configureAppearance()
+        installKeyMonitor()
 
         // Re-apply appearance when relevant settings change
         let s = TerminalSettings.shared
@@ -90,7 +91,34 @@ class RobotermTerminal: LocalProcessTerminalView {
         return super.performKeyEquivalent(with: event)
     }
 
+    /// NSEvent local monitor to intercept Cmd+key BEFORE SwiftTerm's keyDown
+    /// processes them. SwiftTerm's keyDown is `public` (not `open`) so we can't
+    /// override it. This monitor runs first in the event pipeline.
+    private var keyMonitor: Any?
+
+    private func installKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, self.window?.firstResponder === self else { return event }
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if flags.contains(.command) && !flags.contains(.control) {
+                if let mainMenu = NSApp.mainMenu, mainMenu.performKeyEquivalent(with: event) {
+                    return nil // consumed by menu
+                }
+            }
+            return event
+        }
+    }
+
+    private func removeKeyMonitor() {
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+        }
+    }
+
     deinit {
+        removeKeyMonitor()
         Self.liveTerminals.remove(ObjectIdentifier(self))
         if Self.liveTerminals.isEmpty, let monitor = Self.sharedMouseMonitor {
             NSEvent.removeMonitor(monitor)

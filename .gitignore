@@ -23,6 +23,9 @@ Package.resolved
 .vscode/
 .idea/
 
+# Claude Code (internal prompts)
+.claude/
+
 # Legacy (removed)
 electrobun/
 ghast.xcodeproj/
