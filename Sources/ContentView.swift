@@ -131,11 +131,7 @@ struct WorkspaceAddButton: View {
     @State private var isHovering = false
 
     var body: some View {
-        Button(action: {
-            let dir = TerminalSettings.shared.defaultWorkingDirectory
-            let ws = tabManager.createWorkspace(directory: dir)
-            ws.createTab()
-        }) {
+        Button(action: pickDirectoryAndCreate) {
             HStack(spacing: 4) {
                 Text("+")
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
@@ -155,6 +151,22 @@ struct WorkspaceAddButton: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
+    }
+
+    private func pickDirectoryAndCreate() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Open"
+        panel.message = "Choose a directory for the new workspace"
+        panel.directoryURL = URL(fileURLWithPath: TerminalSettings.shared.defaultWorkingDirectory)
+
+        if panel.runModal() == .OK, let url = panel.url {
+            let ws = tabManager.createWorkspace(directory: url.path)
+            ws.createTab()
+        }
     }
 }
 
