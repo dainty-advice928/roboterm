@@ -19,16 +19,53 @@ final class Workspace: Identifiable, ObservableObject {
         return tabs.first { $0.id == id }
     }
 
+    /// Whether this workspace has a ROS2 colcon workspace detected.
+    var isROS2Workspace: Bool {
+        let fm = FileManager.default
+        return fm.fileExists(atPath: directory + "/install/setup.bash")
+            || fm.fileExists(atPath: directory + "/install/setup.zsh")
+    }
+
+    /// Whether this workspace has a package.xml (is a ROS2 package).
+    var isROS2Package: Bool {
+        FileManager.default.fileExists(atPath: directory + "/package.xml")
+    }
+
     /// Display name: custom name if set, otherwise last path component of the directory.
+    /// Appends [ROS2] badge if detected.
     var displayName: String {
         if let customName, !customName.isEmpty { return customName }
         let name = (directory as NSString).lastPathComponent
-        return name.isEmpty ? "~" : name
+        let base = name.isEmpty ? "~" : name
+        return base
+    }
+
+    /// Badge text shown next to workspace name (e.g. "ROS2", "PKG").
+    var badge: String? {
+        if isROS2Workspace { return "ROS2" }
+        if isROS2Package { return "PKG" }
+        return nil
     }
 
     init(directory: String) {
         self.id = UUID()
         self.directory = directory
+
+        // Auto-name workspace from package.xml if present
+        if let packageName = Self.parsePackageName(at: directory) {
+            self.customName = packageName
+        }
+    }
+
+    /// Parse the package name from package.xml if it exists.
+    private static func parsePackageName(at directory: String) -> String? {
+        let packageXmlPath = directory + "/package.xml"
+        guard let content = try? String(contentsOfFile: packageXmlPath, encoding: .utf8) else { return nil }
+        // Simple regex: <name>package_name</name>
+        guard let range = content.range(of: "<name>([^<]+)</name>", options: .regularExpression) else { return nil }
+        let match = content[range]
+        let name = match.replacingOccurrences(of: "<name>", with: "").replacingOccurrences(of: "</name>", with: "")
+        return name.isEmpty ? nil : name
     }
 
     @discardableResult

@@ -207,10 +207,21 @@ struct WorkspaceItemView: View {
                         isEditing = false
                     }
                 } else {
-                    Text(workspace.displayName.uppercased())
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .lineLimit(1)
-                        .foregroundColor(isSelected ? rfAccent : .white.opacity(0.5))
+                    HStack(spacing: 6) {
+                        Text(workspace.displayName.uppercased())
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .lineLimit(1)
+                            .foregroundColor(isSelected ? rfAccent : .white.opacity(0.5))
+
+                        if let badge = workspace.badge {
+                            Text(badge)
+                                .font(.system(size: 7, weight: .bold, design: .monospaced))
+                                .foregroundColor(rfGreen)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Rectangle().stroke(rfGreen.opacity(0.4), lineWidth: 1))
+                        }
+                    }
                 }
 
                 Text(directoryLabel)

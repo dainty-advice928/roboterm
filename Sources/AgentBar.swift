@@ -75,14 +75,29 @@ struct AgentBar: View {
     }
 
     private func launchCommand(_ command: String) {
-        guard let ws = tabManager.selectedWorkspace else { return }
-        let tab = ws.createTab()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            if let surface = tab.terminalView?.surface {
-                let cmd = command + "\n"
-                cmd.withCString { ptr in
-                    ghostty_surface_text(surface, ptr, UInt(cmd.utf8.count))
+        // TUI/long-running commands open in a new tab, quick commands run in current tab
+        let tuiCommands = ["claude", "codex", "rviz2", "rqt", "rqt_graph", "gz sim",
+                           "python3 -m mujoco.viewer", "isaac-sim"]
+        let openInNewTab = tuiCommands.contains(where: { command.hasPrefix($0) })
+
+        if openInNewTab {
+            guard let ws = tabManager.selectedWorkspace else { return }
+            let tab = ws.createTab()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if let surface = tab.terminalView?.surface {
+                    let cmd = command + "\n"
+                    cmd.withCString { ptr in
+                        ghostty_surface_text(surface, ptr, UInt(cmd.utf8.count))
+                    }
                 }
+            }
+        } else {
+            // Run in current tab
+            guard let tab = tabManager.selectedTab,
+                  let surface = tab.terminalView?.surface else { return }
+            let cmd = command + "\n"
+            cmd.withCString { ptr in
+                ghostty_surface_text(surface, ptr, UInt(cmd.utf8.count))
             }
         }
     }

@@ -339,10 +339,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Robotics menu actions
 
+    /// Run a command in a new tab (for TUI/long-running processes).
     private func runCommandInNewTab(_ command: String) {
         guard let mgr = focusedTabManager else { return }
         let tab = mgr.createTab()
-        // Send command after terminal initializes
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             if let surface = tab.terminalView?.surface {
                 let cmd = command + "\n"
@@ -353,30 +353,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // ROS2 Introspection
-    @objc private func ros2NodeList(_ sender: Any?) { runCommandInNewTab("ros2 node list") }
-    @objc private func ros2TopicList(_ sender: Any?) { runCommandInNewTab("ros2 topic list -v") }
-    @objc private func ros2ServiceList(_ sender: Any?) { runCommandInNewTab("ros2 service list") }
-    @objc private func ros2ActionList(_ sender: Any?) { runCommandInNewTab("ros2 action list -t") }
-    @objc private func ros2ParamList(_ sender: Any?) { runCommandInNewTab("ros2 param list") }
-    @objc private func ros2InterfaceList(_ sender: Any?) { runCommandInNewTab("ros2 interface list") }
+    /// Run a command in the current tab (for quick queries).
+    private func runCommand(_ command: String) {
+        guard let mgr = focusedTabManager,
+              let tab = mgr.selectedTab,
+              let surface = tab.terminalView?.surface else { return }
+        let cmd = command + "\n"
+        cmd.withCString { ptr in
+            ghostty_surface_text(surface, ptr, UInt(cmd.utf8.count))
+        }
+    }
+
+    // ROS2 Introspection — run in current tab (quick queries)
+    @objc private func ros2NodeList(_ sender: Any?) { runCommand("ros2 node list") }
+    @objc private func ros2TopicList(_ sender: Any?) { runCommand("ros2 topic list -v") }
+    @objc private func ros2ServiceList(_ sender: Any?) { runCommand("ros2 service list") }
+    @objc private func ros2ActionList(_ sender: Any?) { runCommand("ros2 action list -t") }
+    @objc private func ros2ParamList(_ sender: Any?) { runCommand("ros2 param list") }
+    @objc private func ros2InterfaceList(_ sender: Any?) { runCommand("ros2 interface list") }
     @objc private func ros2Graph(_ sender: Any?) { runCommandInNewTab("rqt_graph") }
 
-    // ROS2 Diagnostics
-    @objc private func ros2Doctor(_ sender: Any?) { runCommandInNewTab("ros2 doctor --report") }
-    @objc private func ros2DaemonStatus(_ sender: Any?) { runCommandInNewTab("ros2 daemon status") }
+    // ROS2 Diagnostics — quick queries in current tab
+    @objc private func ros2Doctor(_ sender: Any?) { runCommand("ros2 doctor --report") }
+    @objc private func ros2DaemonStatus(_ sender: Any?) { runCommand("ros2 daemon status") }
     @objc private func ros2Multicast(_ sender: Any?) { runCommandInNewTab("ros2 multicast receive") }
-    @objc private func ros2Wtf(_ sender: Any?) { runCommandInNewTab("ros2 wtf") }
+    @objc private func ros2Wtf(_ sender: Any?) { runCommand("ros2 wtf") }
     @objc private func ros2HzScan(_ sender: Any?) { runCommandInNewTab("ros2 topic hz /scan") }
     @objc private func ros2HzCamera(_ sender: Any?) { runCommandInNewTab("ros2 topic hz /camera/image_raw") }
     @objc private func ros2DelayTf(_ sender: Any?) { runCommandInNewTab("ros2 topic delay /tf") }
 
     // ROS2 Transforms
-    @objc private func ros2TfTree(_ sender: Any?) { runCommandInNewTab("ros2 run tf2_tools view_frames") }
+    @objc private func ros2TfTree(_ sender: Any?) { runCommand("ros2 run tf2_tools view_frames") }
     @objc private func ros2TfEcho(_ sender: Any?) { runCommandInNewTab("ros2 run tf2_ros tf2_echo base_link map") }
     @objc private func ros2TfMonitor(_ sender: Any?) { runCommandInNewTab("ros2 run tf2_ros tf2_monitor") }
 
-    // Launch & Build
+    // Launch & Build — new tab (long-running)
     @objc private func ros2Launch(_ sender: Any?) { runCommandInNewTab("ros2 launch ") }
     @objc private func ros2Run(_ sender: Any?) { runCommandInNewTab("ros2 run ") }
     @objc private func colconBuild(_ sender: Any?) { runCommandInNewTab("colcon build --symlink-install") }
