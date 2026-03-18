@@ -4,6 +4,129 @@ import IOKit.usb
 import Network
 import SwiftUI
 
+// MARK: - USB Hotplug Monitor
+
+/// Runs on a dedicated background thread with its own CFRunLoop so that
+/// IOKit matching notifications fire independently of the main run loop.
+final class USBHotplugMonitor {
+    static let shared = USBHotplugMonitor()
+
+    var onConnect: ((String) -> Void)?
+    var onDisconnect: ((String) -> Void)?
+
+    private var notifyPort: IONotificationPortRef?
+    private var matchedIterator: io_iterator_t = 0
+    private var terminatedIterator: io_iterator_t = 0
+    private var runLoop: CFRunLoop?
+    private let thread: Thread
+
+    // Stash self pointer so C callbacks can reach it.
+    private var selfPtr: UnsafeMutableRawPointer?
+
+    private init() {
+        // Thread is set up in start() — just create a placeholder here.
+        thread = Thread()
+    }
+
+    func start() {
+        let t = Thread {
+            self.runMonitor()
+        }
+        t.name = "roboterm.usb.hotplug"
+        t.qualityOfService = .utility
+        t.start()
+    }
+
+    private func runMonitor() {
+        runLoop = CFRunLoopGetCurrent()
+
+        guard let port = IONotificationPortCreate(kIOMainPortDefault) else { return }
+        notifyPort = port
+
+        let source = IONotificationPortGetRunLoopSource(port).takeUnretainedValue()
+        CFRunLoopAddSource(runLoop, source, .defaultMode)
+
+        // Retain self for C callback context — balanced in deinit.
+        selfPtr = Unmanaged.passRetained(self).toOpaque()
+
+        // --- Matched (connect) notification ---
+        let matchConnectCB: IOServiceMatchingCallback = { (refCon, iterator) in
+            guard let ctx = refCon else { return }
+            let monitor = Unmanaged<USBHotplugMonitor>.fromOpaque(ctx).takeUnretainedValue()
+            monitor.drainIterator(iterator, connected: true)
+        }
+
+        IOServiceAddMatchingNotification(
+            port,
+            kIOMatchedNotification,
+            IOServiceMatching("IOUSBHostDevice"),
+            matchConnectCB,
+            selfPtr,
+            &matchedIterator
+        )
+
+        // Drain existing-at-startup devices so IOKit arms future notifications.
+        // We do NOT call onConnect for these — HardwareState.init() handles
+        // the initial population via enumerateUSBDevices().
+        drainIterator(matchedIterator, connected: false)
+
+        // --- Terminated (disconnect) notification ---
+        let matchTermCB: IOServiceMatchingCallback = { (refCon, iterator) in
+            guard let ctx = refCon else { return }
+            let monitor = Unmanaged<USBHotplugMonitor>.fromOpaque(ctx).takeUnretainedValue()
+            monitor.drainIterator(iterator, connected: false)
+        }
+
+        IOServiceAddMatchingNotification(
+            port,
+            kIOTerminatedNotification,
+            IOServiceMatching("IOUSBHostDevice"),
+            matchTermCB,
+            selfPtr,
+            &terminatedIterator
+        )
+        drainIterator(terminatedIterator, connected: false)
+
+        // Run until cancelled.
+        CFRunLoopRun()
+
+        // Cleanup if run loop exits.
+        if matchedIterator != 0    { IOObjectRelease(matchedIterator) }
+        if terminatedIterator != 0 { IOObjectRelease(terminatedIterator) }
+        IONotificationPortDestroy(port)
+        if let ptr = selfPtr {
+            Unmanaged<USBHotplugMonitor>.fromOpaque(ptr).release()
+        }
+    }
+
+    private func drainIterator(_ iterator: io_iterator_t, connected: Bool) {
+        var entry = IOIteratorNext(iterator)
+        while entry != 0 {
+            defer { IOObjectRelease(entry) }
+            let name = usbProductName(from: entry)
+            if !name.isEmpty {
+                if connected {
+                    DispatchQueue.main.async { self.onConnect?(name) }
+                } else {
+                    DispatchQueue.main.async { self.onDisconnect?(name) }
+                }
+            }
+            entry = IOIteratorNext(iterator)
+        }
+    }
+
+    private func usbProductName(from entry: io_object_t) -> String {
+        guard let cf = IORegistryEntryCreateCFProperty(
+            entry, "USB Product Name" as CFString, kCFAllocatorDefault, 0
+        ) else { return "" }
+        return (cf.takeRetainedValue() as? String) ?? ""
+    }
+
+    deinit {
+        if let rl = runLoop { CFRunLoopStop(rl) }
+    }
+}
+
 // MARK: - Design tokens
 
 private let panelBg    = Color(red: 0x06/255, green: 0x06/255, blue: 0x06/255)
@@ -82,9 +205,47 @@ final class HardwareState: ObservableObject {
 
         self.devices = devices
 
-        // Then schedule periodic background scans
+        // Wire up IOKit hotplug notifications
+        USBHotplugMonitor.shared.onConnect = { [weak self] name in
+            guard let self else { return }
+            // Classify and insert/update the device
+            let device = HardwarePanel.classifyUSBDevice(name: name)
+            if let idx = self.devices.firstIndex(where: { $0.name == name }) {
+                self.devices[idx] = HardwareDevice(
+                    name: name, type: self.devices[idx].type,
+                    status: .connected, detail: self.devices[idx].detail
+                )
+            } else {
+                self.devices.append(device)
+                self.sortDevices()
+            }
+        }
+
+        USBHotplugMonitor.shared.onDisconnect = { [weak self] name in
+            guard let self else { return }
+            if let idx = self.devices.firstIndex(where: { $0.name == name }) {
+                let old = self.devices[idx]
+                self.devices[idx] = HardwareDevice(
+                    name: old.name, type: old.type,
+                    status: .disconnected, detail: old.detail
+                )
+                self.sortDevices()
+            }
+        }
+
+        USBHotplugMonitor.shared.start()
+
+        // Then schedule periodic background scans for network host reachability
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.scan() }
+        }
+    }
+
+    private func sortDevices() {
+        devices.sort { a, b in
+            if a.status != b.status { return a.status == .connected }
+            if a.type.rawValue != b.type.rawValue { return a.type.rawValue < b.type.rawValue }
+            return a.name < b.name
         }
     }
 
@@ -216,29 +377,14 @@ struct HardwarePanel: View {
         ))
         #endif
 
-        // 2. USB devices via IOKit (no subprocess, works in sandbox)
+        // 2. USB devices via IOKit
         for productName in enumerateUSBDevices() {
-            // Skip HID sub-interfaces, hubs, monitor controls
+            // Skip HID sub-interfaces, hubs, and monitor controls — they add
+            // noise without being meaningful robotics hardware.
             if productName.contains("HID") || productName.contains("Hub") ||
                productName.contains("Monitor") || productName.contains("Controls") { continue }
 
-            let device: HardwareDevice
-            if productName.contains("ZED") || productName.contains("Stereolabs") {
-                device = HardwareDevice(name: productName, type: .camera, status: .connected, detail: "Stereolabs Depth Camera")
-            } else if productName.contains("RealSense") {
-                device = HardwareDevice(name: productName, type: .camera, status: .connected, detail: "Intel Depth Camera")
-            } else if productName.contains("Webcam") || productName.contains("Camera") || productName.contains("Cam") {
-                device = HardwareDevice(name: productName, type: .camera, status: .connected, detail: "USB Camera")
-            } else if productName.contains("Velodyne") || productName.contains("Ouster") || productName.contains("Livox") || productName.contains("RPLIDAR") || productName.contains("Hokuyo") || productName.contains("LiDAR") {
-                device = HardwareDevice(name: productName, type: .lidar, status: .connected, detail: "LiDAR Sensor")
-            } else if productName.contains("IMU") || productName.contains("Bosch") || productName.contains("ICM") || productName.contains("MPU") {
-                device = HardwareDevice(name: productName, type: .imu, status: .connected, detail: "Inertial Measurement Unit")
-            } else if productName.contains("Joystick") || productName.contains("Gamepad") || productName.contains("Controller") || productName.contains("Xbox") || productName.contains("DualSense") {
-                device = HardwareDevice(name: productName, type: .gamepad, status: .connected, detail: "Game Controller")
-            } else {
-                device = HardwareDevice(name: productName, type: .serial, status: .connected, detail: "USB Device")
-            }
-
+            let device = HardwarePanel.classifyUSBDevice(name: productName)
             if !results.contains(where: { $0.name == device.name }) {
                 results.append(device)
             }
@@ -271,6 +417,33 @@ struct HardwarePanel: View {
         return results
     }
 
+    // MARK: - USB device classification
+
+    /// Classify a USB product name string into a typed HardwareDevice.
+    /// Shared between the initial scan and hotplug connect callbacks.
+    static func classifyUSBDevice(name productName: String) -> HardwareDevice {
+        if productName.contains("ZED") || productName.contains("Stereolabs") {
+            return HardwareDevice(name: productName, type: .camera, status: .connected, detail: "Stereolabs Depth Camera")
+        } else if productName.contains("RealSense") {
+            return HardwareDevice(name: productName, type: .camera, status: .connected, detail: "Intel Depth Camera")
+        } else if productName.contains("Webcam") || productName.contains("Camera") || productName.contains("Cam") {
+            return HardwareDevice(name: productName, type: .camera, status: .connected, detail: "USB Camera")
+        } else if productName.contains("Velodyne") || productName.contains("Ouster") ||
+                  productName.contains("Livox") || productName.contains("RPLIDAR") ||
+                  productName.contains("Hokuyo") || productName.contains("LiDAR") {
+            return HardwareDevice(name: productName, type: .lidar, status: .connected, detail: "LiDAR Sensor")
+        } else if productName.contains("IMU") || productName.contains("Bosch") ||
+                  productName.contains("ICM") || productName.contains("MPU") {
+            return HardwareDevice(name: productName, type: .imu, status: .connected, detail: "Inertial Measurement Unit")
+        } else if productName.contains("Joystick") || productName.contains("Gamepad") ||
+                  productName.contains("Controller") || productName.contains("Xbox") ||
+                  productName.contains("DualSense") {
+            return HardwareDevice(name: productName, type: .gamepad, status: .connected, detail: "Game Controller")
+        } else {
+            return HardwareDevice(name: productName, type: .serial, status: .connected, detail: "USB Device")
+        }
+    }
+
     // MARK: - Network hosts config
 
     /// Load network hosts from ~/.config/roboterm/hosts.json
@@ -300,49 +473,73 @@ struct HardwarePanel: View {
         return hosts
     }
 
-    // MARK: - IOKit USB enumeration (no subprocess needed)
+    // MARK: - IOKit USB enumeration
 
-    private static func enumerateUSBDevices() -> [String] {
+    /// Enumerates connected USB devices using IOKit directly.
+    ///
+    /// On macOS 13+ / Apple Silicon all USB devices are registered under the
+    /// `IOUSBHostDevice` class. `IOUSBDevice` is a legacy alias that may not
+    /// exist on ARM hardware, so we query `IOUSBHostDevice` exclusively to
+    /// avoid empty or duplicate results.
+    ///
+    /// Falls back to `/usr/sbin/ioreg` (absolute path — required when running
+    /// from an .app bundle where $PATH is not set) only if the IOKit call
+    /// returns an empty set, which should never happen in practice.
+    static func enumerateUSBDevices() -> [String] {
         var names: [String] = []
 
-        // Try both IOUSBDevice (legacy) and IOUSBHostDevice (modern macOS)
-        for className in ["IOUSBDevice", "IOUSBHostDevice"] {
-            var iterator: io_iterator_t = 0
-            let matchingDict = IOServiceMatching(className)
-            let result = IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &iterator)
-            guard result == KERN_SUCCESS else { continue }
-
-            var device: io_object_t = IOIteratorNext(iterator)
-            while device != 0 {
-                if let namePtr = IORegistryEntryCreateCFProperty(device, "USB Product Name" as CFString, kCFAllocatorDefault, 0) {
-                    if let name = namePtr.takeRetainedValue() as? String, !name.isEmpty {
-                        if !names.contains(name) {
-                            names.append(name)
-                        }
-                    }
-                }
-                IOObjectRelease(device)
-                device = IOIteratorNext(iterator)
-            }
-            IOObjectRelease(iterator)
+        // IOUSBHostDevice is the canonical class on macOS 12+ and all Apple
+        // Silicon hardware. IOServiceMatching consumes (releases) the returned
+        // dictionary, so we must not release it ourselves.
+        var iterator: io_iterator_t = 0
+        guard let matchingDict = IOServiceMatching("IOUSBHostDevice") else {
+            return ioregsSubprocessFallback()
         }
 
-        // Fallback: if IOKit returned nothing, try ioreg subprocess
+        let kr = IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &iterator)
+        guard kr == KERN_SUCCESS, iterator != 0 else {
+            return ioregsSubprocessFallback()
+        }
+
+        var device: io_object_t = IOIteratorNext(iterator)
+        while device != 0 {
+            if let cf = IORegistryEntryCreateCFProperty(
+                device, "USB Product Name" as CFString, kCFAllocatorDefault, 0
+            ) {
+                if let name = cf.takeRetainedValue() as? String, !name.isEmpty {
+                    if !names.contains(name) { names.append(name) }
+                }
+            }
+            IOObjectRelease(device)
+            device = IOIteratorNext(iterator)
+        }
+        IOObjectRelease(iterator)
+
+        // If IOUSBHostDevice returned nothing (unexpected — maybe an older
+        // Intel Mac running macOS 12 with the legacy stack), fall back to the
+        // subprocess. Using absolute path because .app bundles don't get /usr/sbin
+        // in $PATH from launchd.
         if names.isEmpty {
-            if let output = runShell("ioreg -p IOUSB -l 2>/dev/null | grep 'USB Product Name'") {
-                for line in output.components(separatedBy: "\n") {
-                    let trimmed = line.trimmingCharacters(in: .whitespaces)
-                    guard let start = trimmed.range(of: "\"USB Product Name\" = \"") else { continue }
-                    let rest = trimmed[start.upperBound...]
-                    guard let end = rest.firstIndex(of: "\"") else { continue }
-                    let name = String(rest[..<end])
-                    if !name.isEmpty && !names.contains(name) {
-                        names.append(name)
-                    }
-                }
-            }
+            return ioregsSubprocessFallback()
         }
 
+        return names
+    }
+
+    /// Last-resort fallback: parse `ioreg` output.
+    /// Uses an absolute path so it works from within an .app bundle.
+    private static func ioregsSubprocessFallback() -> [String] {
+        var names: [String] = []
+        // Absolute path required — /usr/sbin is not in PATH for .app bundles.
+        guard let output = runShell("/usr/sbin/ioreg -p IOUSB -l") else { return names }
+        for line in output.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard let start = trimmed.range(of: "\"USB Product Name\" = \"") else { continue }
+            let rest = trimmed[start.upperBound...]
+            guard let end = rest.firstIndex(of: "\"") else { continue }
+            let name = String(rest[..<end])
+            if !name.isEmpty && !names.contains(name) { names.append(name) }
+        }
         return names
     }
 
