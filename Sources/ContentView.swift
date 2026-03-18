@@ -192,7 +192,7 @@ struct WorkspaceItemView: View {
                 .fill(isSelected ? rfAccent : Color.clear)
                 .frame(width: 3)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 if isEditing {
                     TextField("Name", text: $editText, onCommit: {
                         let trimmed = editText.trimmingCharacters(in: .whitespaces)
@@ -200,7 +200,7 @@ struct WorkspaceItemView: View {
                         isEditing = false
                     })
                     .textFieldStyle(.plain)
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
                     .foregroundColor(.white.opacity(0.9))
                     .lineLimit(1)
                     .onExitCommand {
@@ -208,38 +208,38 @@ struct WorkspaceItemView: View {
                     }
                 } else {
                     Text(workspace.displayName.uppercased())
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
                         .lineLimit(1)
                         .foregroundColor(isSelected ? rfAccent : .white.opacity(0.5))
                 }
 
                 Text(directoryLabel)
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(size: 10, design: .monospaced))
                     .lineLimit(1)
                     .truncationMode(.middle)
-                    .foregroundColor(isSelected ? .white.opacity(0.35) : .white.opacity(0.18))
+                    .foregroundColor(isSelected ? .white.opacity(0.4) : .white.opacity(0.2))
             }
-            .padding(.leading, 8)
+            .padding(.leading, 10)
 
             Spacer()
 
             if isHovering {
                 Button(action: onClose) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.white.opacity(0.4))
-                        .frame(width: 16, height: 16)
+                        .frame(width: 18, height: 18)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             } else {
                 Text("\(workspace.tabs.count)")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(isSelected ? rfAccent.opacity(0.5) : .white.opacity(0.15))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(isSelected ? rfAccent.opacity(0.6) : .white.opacity(0.15))
             }
         }
-        .padding(.trailing, 8)
-        .padding(.vertical, 8)
+        .padding(.trailing, 10)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .background(
