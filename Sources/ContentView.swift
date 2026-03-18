@@ -244,7 +244,7 @@ struct WorkspaceItemView: View {
         .contentShape(Rectangle())
         .background(
             Rectangle()
-                .fill(isSelected ? rfAccent.opacity(0.06) : isHovering ? Color.white.opacity(0.03) : Color.clear)
+                .fill(isSelected ? rfAccent.opacity(0.12) : isHovering ? Color.white.opacity(0.04) : Color.clear)
         )
         .overlay(alignment: .bottom) {
             Rectangle().fill(Color.white.opacity(0.04)).frame(height: 1)
