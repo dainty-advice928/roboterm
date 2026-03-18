@@ -950,6 +950,37 @@ rt-log() {
 }
 
 # ============================================================
+# rt dupes — Find duplicate files by size+hash
+# ============================================================
+rt-dupes() {
+    _rt_header "Duplicate Finder"
+    echo ""
+
+    local dir="${1:-.}"
+    local min_size="${2:-10M}"
+
+    _rt_info "Scanning: $dir (files > $min_size)"
+    echo ""
+
+    # Find files by size, then hash duplicates
+    find "$dir" -type f -size +${min_size} 2>/dev/null | while read f; do
+        du -h "$f" 2>/dev/null
+    done | sort -rh | awk '{print $2}' | while read f; do
+        md5 -q "$f" 2>/dev/null | tr -d '\n'
+        echo "  $f"
+    done | sort | uniq -D -w 32 | while read line; do
+        local hash="${line:0:32}"
+        local file="${line:34}"
+        local size=$(du -sh "$file" 2>/dev/null | awk '{print $1}')
+        echo -e "  ${_RT_YELLOW}$size${_RT_RESET}  ${_RT_DIM}$hash${_RT_RESET}  $file"
+    done
+
+    echo ""
+    _rt_info "Usage: rt dupes [directory] [min_size]"
+    _rt_info "Example: rt dupes ~/datasets 100M"
+}
+
+# ============================================================
 # rt — Main entry point / help
 # ============================================================
 rt() {
@@ -982,6 +1013,7 @@ rt() {
         alias)      shift; rt-alias "$@" ;;
         disk)       shift; rt-disk "$@" ;;
         log)        shift; rt-log "$@" ;;
+        dupes)      shift; rt-dupes "$@" ;;
         help|*)
             echo -e "${_RT_ORANGE}${_RT_BOLD}"
             echo "  ____   ___  ____   ___ _____ _____ ____  __  __ "
@@ -1017,12 +1049,13 @@ rt() {
             echo -e "  ${_RT_ORANGE}rt alias${_RT_RESET}      Custom command shortcuts [list|add]"
             echo -e "  ${_RT_ORANGE}rt disk${_RT_RESET}       Disk usage [bags|large|clean]"
             echo -e "  ${_RT_ORANGE}rt log${_RT_RESET}        ROS2 logs [latest|follow|search|clean]"
+            echo -e "  ${_RT_ORANGE}rt dupes${_RT_RESET}      Find duplicate files [dir] [min_size]"
             echo ""
             ;;
     esac
 }
 
 # Auto-complete
-complete -W "init nodes topics services params doctor tf build bag hz echo launch dds docker lifecycle sensor ssh watch kill graph status info profile export alias disk log help" rt
+complete -W "init nodes topics services params doctor tf build bag hz echo launch dds docker lifecycle sensor ssh watch kill graph status info profile export alias disk log dupes help" rt
 
 echo -e "${_RT_DIM}ROBOTERM tools loaded. Type ${_RT_ORANGE}rt${_RT_RESET}${_RT_DIM} for help.${_RT_RESET}"
