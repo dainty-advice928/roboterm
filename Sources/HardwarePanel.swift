@@ -1,4 +1,6 @@
 import AppKit
+import IOKit
+import IOKit.usb
 import SwiftUI
 
 // MARK: - Design tokens
@@ -45,13 +47,67 @@ struct NetworkHost: Codable {
     let type: String       // "jetson", "rpi", "server", "robot"
 }
 
+// MARK: - Hardware state (persists across SwiftUI redraws)
+
+@MainActor
+final class HardwareState: ObservableObject {
+    static let shared = HardwareState()
+
+    @Published var devices: [HardwareDevice] = []
+    @Published var isScanning = false
+
+    private let scanQueue = DispatchQueue(label: "roboterm.hardware.scan")
+    private var timer: Timer?
+
+    private init() {
+        // Start scanning immediately and every 30 seconds
+        scan()
+        timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.scan() }
+        }
+    }
+
+    func scan() {
+        guard !isScanning else { return }
+        isScanning = true
+        let currentDevices = self.devices
+
+        scanQueue.async { [weak self] in
+            let found = HardwarePanel.detectDevices()
+
+            DispatchQueue.main.async {
+                guard let self else { return }
+
+                var registry: [String: HardwareDevice] = [:]
+                for device in currentDevices {
+                    registry[device.name] = HardwareDevice(
+                        name: device.name, type: device.type,
+                        status: .disconnected, detail: device.detail
+                    )
+                }
+                for device in found {
+                    registry[device.name] = HardwareDevice(
+                        name: device.name, type: device.type,
+                        status: .connected, detail: device.detail
+                    )
+                }
+                let sorted = registry.values.sorted { a, b in
+                    if a.status != b.status { return a.status == .connected }
+                    if a.type.rawValue != b.type.rawValue { return a.type.rawValue < b.type.rawValue }
+                    return a.name < b.name
+                }
+
+                self.devices = Array(sorted)
+                self.isScanning = false
+            }
+        }
+    }
+}
+
 // MARK: - Hardware Panel View
 
 struct HardwarePanel: View {
-    @State private var devices: [HardwareDevice] = []
-    @State private var isScanning = false
-
-    private let scanTimer = Timer.publish(every: 15, on: .main, in: .common).autoconnect()
+    @ObservedObject private var state = HardwareState.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -65,12 +121,12 @@ struct HardwarePanel: View {
                     .foregroundColor(rfAccent.opacity(0.7))
                     .tracking(1.5)
                 Spacer()
-                Button(action: { scanDevices() }) {
-                    Image(systemName: isScanning ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
+                Button(action: { state.scan() }) {
+                    Image(systemName: state.isScanning ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
                         .font(.system(size: 8))
                         .foregroundColor(rfDim)
-                        .rotationEffect(.degrees(isScanning ? 360 : 0))
-                        .animation(isScanning ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isScanning)
+                        .rotationEffect(.degrees(state.isScanning ? 360 : 0))
+                        .animation(state.isScanning ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: state.isScanning)
                 }
                 .buttonStyle(.plain)
             }
@@ -79,7 +135,7 @@ struct HardwarePanel: View {
             .padding(.bottom, 4)
 
             // Device list
-            if devices.isEmpty && !isScanning {
+            if state.devices.isEmpty && !state.isScanning {
                 HStack(spacing: 4) {
                     Text("SCANNING...")
                         .font(.system(size: 8, weight: .medium, design: .monospaced))
@@ -89,7 +145,7 @@ struct HardwarePanel: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
             } else {
-                ForEach(devices) { device in
+                ForEach(state.devices) { device in
                     DeviceRow(device: device)
                 }
             }
@@ -99,7 +155,7 @@ struct HardwarePanel: View {
                 .padding(.horizontal, 8)
                 .padding(.top, 4)
 
-            let connectedCount = devices.filter { $0.status == .connected }.count
+            let connectedCount = state.devices.filter { $0.status == .connected }.count
             HStack(spacing: 4) {
                 Circle().fill(connectedCount > 0 ? rfGreen : rfDim).frame(width: 5, height: 5)
                 Text(connectedCount > 0 ? "SYSTEM: ONLINE" : "SYSTEM: IDLE")
@@ -107,7 +163,7 @@ struct HardwarePanel: View {
                     .foregroundColor(connectedCount > 0 ? rfGreen.opacity(0.6) : rfDim)
                     .tracking(0.5)
                 Spacer()
-                Text("\(connectedCount)/\(devices.count)")
+                Text("\(connectedCount)/\(state.devices.count)")
                     .font(.system(size: 8, weight: .bold, design: .monospaced))
                     .foregroundColor(rfAccent.opacity(0.5))
             }
@@ -115,52 +171,6 @@ struct HardwarePanel: View {
             .padding(.vertical, 6)
         }
         .background(panelBg)
-        .onAppear { scanDevices() }
-        .onReceive(scanTimer) { _ in scanDevices() }
-    }
-
-    // MARK: - Device scanning
-
-    private func scanDevices() {
-        isScanning = true
-        DispatchQueue.global(qos: .utility).async {
-            let found = Self.detectDevices()
-
-            DispatchQueue.main.async {
-                // Merge: keep all previously seen devices, update their status
-                var registry: [String: HardwareDevice] = [:]
-
-                // Keep all existing devices (mark disconnected by default)
-                for device in self.devices {
-                    registry[device.name] = HardwareDevice(
-                        name: device.name, type: device.type,
-                        status: .disconnected, detail: device.detail
-                    )
-                }
-
-                // Update/add found devices as connected
-                for device in found {
-                    registry[device.name] = HardwareDevice(
-                        name: device.name, type: device.type,
-                        status: .connected, detail: device.detail
-                    )
-                }
-
-                // Sort: connected first, then by type, then alphabetical
-                let sorted = registry.values.sorted { a, b in
-                    if a.status != b.status {
-                        return a.status == .connected
-                    }
-                    if a.type.rawValue != b.type.rawValue {
-                        return a.type.rawValue < b.type.rawValue
-                    }
-                    return a.name < b.name
-                }
-
-                self.devices = Array(sorted)
-                self.isScanning = false
-            }
-        }
     }
 
     // MARK: - Auto-detect all hardware
@@ -184,47 +194,31 @@ struct HardwarePanel: View {
             }
         }
 
-        // 2. USB devices via ioreg (sandbox-safe)
-        if let usbOutput = runShell("ioreg -p IOUSB -l 2>/dev/null | grep 'USB Product Name'") {
-            let lines = usbOutput.components(separatedBy: "\n")
+        // 2. USB devices via IOKit (no subprocess, works in sandbox)
+        for productName in enumerateUSBDevices() {
+            // Skip HID sub-interfaces, hubs, monitor controls
+            if productName.contains("HID") || productName.contains("Hub") ||
+               productName.contains("Monitor") || productName.contains("Controls") { continue }
 
-            for line in lines {
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                guard let nameRange = trimmed.range(of: "\"USB Product Name\" = \"") else { continue }
-                let afterPrefix = trimmed[nameRange.upperBound...]
-                guard let endQuote = afterPrefix.firstIndex(of: "\"") else { continue }
-                let productName = String(afterPrefix[..<endQuote])
+            let device: HardwareDevice
+            if productName.contains("ZED") || productName.contains("Stereolabs") {
+                device = HardwareDevice(name: productName, type: .camera, status: .connected, detail: "Stereolabs Depth Camera")
+            } else if productName.contains("RealSense") {
+                device = HardwareDevice(name: productName, type: .camera, status: .connected, detail: "Intel Depth Camera")
+            } else if productName.contains("Webcam") || productName.contains("Camera") || productName.contains("Cam") {
+                device = HardwareDevice(name: productName, type: .camera, status: .connected, detail: "USB Camera")
+            } else if productName.contains("Velodyne") || productName.contains("Ouster") || productName.contains("Livox") || productName.contains("RPLIDAR") || productName.contains("Hokuyo") || productName.contains("LiDAR") {
+                device = HardwareDevice(name: productName, type: .lidar, status: .connected, detail: "LiDAR Sensor")
+            } else if productName.contains("IMU") || productName.contains("Bosch") || productName.contains("ICM") || productName.contains("MPU") {
+                device = HardwareDevice(name: productName, type: .imu, status: .connected, detail: "Inertial Measurement Unit")
+            } else if productName.contains("Joystick") || productName.contains("Gamepad") || productName.contains("Controller") || productName.contains("Xbox") || productName.contains("DualSense") {
+                device = HardwareDevice(name: productName, type: .gamepad, status: .connected, detail: "Game Controller")
+            } else {
+                device = HardwareDevice(name: productName, type: .serial, status: .connected, detail: "USB Device")
+            }
 
-                // Skip HID interfaces (they're sub-devices)
-                if productName.contains("HID") { continue }
-                // Skip hubs
-                if productName.contains("Hub") { continue }
-                // Skip monitor controls
-                if productName.contains("Monitor") || productName.contains("Controls") { continue }
-
-                // Classify the device
-                let device: HardwareDevice
-                if productName.contains("ZED") || productName.contains("Stereolabs") {
-                    device = HardwareDevice(name: productName, type: .camera, status: .connected, detail: "Stereolabs Depth Camera")
-                } else if productName.contains("RealSense") {
-                    device = HardwareDevice(name: productName, type: .camera, status: .connected, detail: "Intel Depth Camera")
-                } else if productName.contains("Webcam") || productName.contains("Camera") || productName.contains("Cam") {
-                    device = HardwareDevice(name: productName, type: .camera, status: .connected, detail: "USB Camera")
-                } else if productName.contains("Velodyne") || productName.contains("Ouster") || productName.contains("Livox") || productName.contains("RPLIDAR") || productName.contains("Hokuyo") || productName.contains("LiDAR") {
-                    device = HardwareDevice(name: productName, type: .lidar, status: .connected, detail: "LiDAR Sensor")
-                } else if productName.contains("IMU") || productName.contains("Bosch") || productName.contains("ICM") || productName.contains("MPU") {
-                    device = HardwareDevice(name: productName, type: .imu, status: .connected, detail: "Inertial Measurement Unit")
-                } else if productName.contains("Joystick") || productName.contains("Gamepad") || productName.contains("Controller") || productName.contains("Xbox") || productName.contains("DualSense") {
-                    device = HardwareDevice(name: productName, type: .gamepad, status: .connected, detail: "Game Controller")
-                } else {
-                    // Generic USB device — still show it
-                    device = HardwareDevice(name: productName, type: .serial, status: .connected, detail: "USB Device")
-                }
-
-                // Deduplicate by name
-                if !results.contains(where: { $0.name == device.name }) {
-                    results.append(device)
-                }
+            if !results.contains(where: { $0.name == device.name }) {
+                results.append(device)
             }
         }
 
@@ -281,6 +275,31 @@ struct HardwarePanel: View {
             return []
         }
         return hosts
+    }
+
+    // MARK: - IOKit USB enumeration (no subprocess needed)
+
+    private static func enumerateUSBDevices() -> [String] {
+        var names: [String] = []
+        var iterator: io_iterator_t = 0
+
+        let matchingDict = IOServiceMatching(kIOUSBDeviceClassName)
+        let result = IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &iterator)
+        guard result == KERN_SUCCESS else { return names }
+
+        var device: io_object_t = IOIteratorNext(iterator)
+        while device != 0 {
+            if let namePtr = IORegistryEntryCreateCFProperty(device, "USB Product Name" as CFString, kCFAllocatorDefault, 0) {
+                if let name = namePtr.takeRetainedValue() as? String, !name.isEmpty {
+                    names.append(name)
+                }
+            }
+            IOObjectRelease(device)
+            device = IOIteratorNext(iterator)
+        }
+        IOObjectRelease(iterator)
+
+        return names
     }
 
     // MARK: - Shell helpers

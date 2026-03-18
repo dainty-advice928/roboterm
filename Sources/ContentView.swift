@@ -93,6 +93,7 @@ struct WorkspaceSidebar: View {
             Rectangle().fill(rfAccent.opacity(0.15)).frame(height: 1)
                 .padding(.horizontal, 8)
 
+            // Workspaces list takes available space above hardware
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 2) {
                     ForEach(tabManager.workspaces) { workspace in
@@ -109,11 +110,11 @@ struct WorkspaceSidebar: View {
                 .padding(.horizontal, 6)
                 .padding(.top, 6)
             }
+            .layoutPriority(1)
 
-            Spacer()
-
-            // Hardware panel — bottom of sidebar
+            // Hardware panel — always visible at bottom with minimum height
             HardwarePanel()
+                .frame(minHeight: 120)
         }
         .background(sidebarBg)
     }

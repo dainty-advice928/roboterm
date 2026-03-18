@@ -49,6 +49,8 @@ targets:
           - UniformTypeIdentifiers
           - "-framework"
           - Carbon
+          - "-framework"
+          - IOKit
     dependencies:
       - framework: ghostty/macos/GhosttyKit.xcframework
         embed: false
