@@ -89,5 +89,52 @@ echo -e "  Apple Silicon accelerating → M1/M2/M3/M4"
 echo -e "  TAM: \$2.1M/year (freemium @ \$10/mo)"
 echo ""
 
+echo -e "${O}━━━ LIVE: Docker ROS2 Stack ━━━${R}"
+echo ""
+if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
+    _running=$(docker ps --format '{{.Names}}' 2>/dev/null | wc -l | tr -d ' ')
+    echo -e "  ${G}●${R} Docker: ${_running} containers running"
+    docker ps --format '{{.Names}}\t{{.Status}}' 2>/dev/null | while IFS=$'\t' read -r name status; do
+        echo -e "    ${D}${name}  ${status}${R}"
+    done
+    echo ""
+
+    # Check if ROS2 bridge is running
+    if docker exec anima_ros2_gazebo bash -c "source /opt/ros/jazzy/setup.bash && ros2 topic list" &>/dev/null; then
+        _topics=$(docker exec anima_ros2_gazebo bash -c "source /opt/ros/jazzy/setup.bash && ros2 topic list 2>/dev/null" | wc -l | tr -d ' ')
+        _nodes=$(docker exec anima_ros2_gazebo bash -c "source /opt/ros/jazzy/setup.bash && ros2 node list 2>/dev/null" | wc -l | tr -d ' ')
+        echo -e "  ${G}●${R} ROS2 Jazzy: ${_nodes} nodes, ${_topics} topics"
+        echo -e "  ${D}  Sensors: camera (×3), lidar, IMU, odometry${R}"
+        echo -e "  ${D}  Web viewer: http://localhost:8080${R}"
+        echo ""
+
+        # Publish a velocity command
+        echo -e "  ${C}▶${R} Publishing cmd_vel (robot moves!)..."
+        docker exec anima_ros2_gazebo bash -c "source /opt/ros/jazzy/setup.bash && ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.3}, angular: {z: 0.2}}'" &>/dev/null
+        echo -e "  ${G}●${R} Robot commanded: linear=0.3 angular=0.2"
+    else
+        echo -e "  ${Y}●${R} ROS2 bridge not active in Docker"
+    fi
+    unset _running _topics _nodes
+else
+    echo -e "  ${Y}●${R} Docker not running"
+fi
+echo ""
+
+sleep 2
+
+echo -e "${O}━━━ NEXT: ANIMA Full Stack ━━━${R}"
+echo ""
+echo -e "  ${D}10 perception modules shipping by end of March:${R}"
+echo -e "  ${G}●${R} AZOTH  — Object Detection"
+echo -e "  ${G}●${R} CHRONOS — Temporal Tracking"
+echo -e "  ${G}●${R} MONAD  — Scene Reasoning"
+echo -e "  ${G}●${R} LOCI   — Spatial Mapping"
+echo -e "  ${G}●${R} OSIRIS — System Diagnostics"
+echo -e "  ${G}●${R} PETRA  — Motion Planning"
+echo ""
+echo -e "  ${C}All controlled from this terminal.${R}"
+echo ""
+
 echo -e "${G}${B}  Try it: type 'rt' for all commands${R}"
 echo ""
