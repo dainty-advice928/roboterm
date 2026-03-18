@@ -78,6 +78,13 @@ final class HardwareState: ObservableObject {
             DispatchQueue.main.async {
                 guard let self else { return }
 
+                // If scan found nothing but we had devices before, keep old state
+                // (scan likely failed due to timing)
+                if found.isEmpty && !currentDevices.isEmpty {
+                    self.isScanning = false
+                    return
+                }
+
                 var registry: [String: HardwareDevice] = [:]
                 for device in currentDevices {
                     registry[device.name] = HardwareDevice(
@@ -88,7 +95,7 @@ final class HardwareState: ObservableObject {
                 for device in found {
                     registry[device.name] = HardwareDevice(
                         name: device.name, type: device.type,
-                        status: .connected, detail: device.detail
+                        status: device.status, detail: device.detail
                     )
                 }
                 let sorted = registry.values.sorted { a, b in
@@ -178,21 +185,13 @@ struct HardwarePanel: View {
     static func detectDevices() -> [HardwareDevice] {
         var results: [HardwareDevice] = []
 
-        // 1. Cameras via SPCameraDataType
-        if let camOutput = runShell("system_profiler SPCameraDataType 2>/dev/null") {
-            if camOutput.contains("MacBook") || camOutput.contains("FaceTime") {
-                results.append(HardwareDevice(
-                    name: "MacBook Camera", type: .camera, status: .connected,
-                    detail: "Built-in Camera"
-                ))
-            }
-            if camOutput.contains("iPhone") {
-                results.append(HardwareDevice(
-                    name: "iPhone Camera", type: .camera, status: .connected,
-                    detail: "Continuity Camera"
-                ))
-            }
-        }
+        // 1. Built-in camera — always present on MacBook
+        #if arch(arm64)
+        results.append(HardwareDevice(
+            name: "MacBook Camera", type: .camera, status: .connected,
+            detail: "Built-in FaceTime Camera"
+        ))
+        #endif
 
         // 2. USB devices via IOKit (no subprocess, works in sandbox)
         for productName in enumerateUSBDevices() {
@@ -222,27 +221,28 @@ struct HardwarePanel: View {
             }
         }
 
-        // 3. Serial ports
-        if let serialOutput = runShell("ls /dev/tty.usb* /dev/cu.usb* 2>/dev/null") {
-            for line in serialOutput.split(separator: "\n").prefix(5) {
-                let name = String(line).components(separatedBy: "/").last ?? "Serial"
-                if !results.contains(where: { $0.name == name }) {
+        // 3. Serial ports via FileManager (no subprocess)
+        if let devContents = try? FileManager.default.contentsOfDirectory(atPath: "/dev") {
+            for entry in devContents where (entry.hasPrefix("tty.usb") || entry.hasPrefix("cu.usb")) {
+                if !results.contains(where: { $0.name == entry }) {
                     results.append(HardwareDevice(
-                        name: name, type: .serial, status: .connected, detail: String(line)
+                        name: entry, type: .serial, status: .connected, detail: "/dev/\(entry)"
                     ))
                 }
             }
         }
 
         // 4. Network hosts from config file (~/.config/roboterm/hosts.json)
+        // Ping each host (skipped if scan is too slow — will be checked next cycle)
         let hosts = loadNetworkHosts()
         for host in hosts {
-            if canReachHost(host.host) {
-                results.append(HardwareDevice(
-                    name: host.name, type: .compute, status: .connected,
-                    detail: "\(host.type) (\(host.host))"
-                ))
-            }
+            // Add to results regardless — scan merge will handle status
+            let reachable = canReachHost(host.host)
+            results.append(HardwareDevice(
+                name: host.name, type: .compute,
+                status: reachable ? .connected : .disconnected,
+                detail: "\(host.type) (\(host.host))"
+            ))
         }
 
         return results
@@ -281,23 +281,44 @@ struct HardwarePanel: View {
 
     private static func enumerateUSBDevices() -> [String] {
         var names: [String] = []
-        var iterator: io_iterator_t = 0
 
-        let matchingDict = IOServiceMatching(kIOUSBDeviceClassName)
-        let result = IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &iterator)
-        guard result == KERN_SUCCESS else { return names }
+        // Try both IOUSBDevice (legacy) and IOUSBHostDevice (modern macOS)
+        for className in ["IOUSBDevice", "IOUSBHostDevice"] {
+            var iterator: io_iterator_t = 0
+            let matchingDict = IOServiceMatching(className)
+            let result = IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &iterator)
+            guard result == KERN_SUCCESS else { continue }
 
-        var device: io_object_t = IOIteratorNext(iterator)
-        while device != 0 {
-            if let namePtr = IORegistryEntryCreateCFProperty(device, "USB Product Name" as CFString, kCFAllocatorDefault, 0) {
-                if let name = namePtr.takeRetainedValue() as? String, !name.isEmpty {
-                    names.append(name)
+            var device: io_object_t = IOIteratorNext(iterator)
+            while device != 0 {
+                if let namePtr = IORegistryEntryCreateCFProperty(device, "USB Product Name" as CFString, kCFAllocatorDefault, 0) {
+                    if let name = namePtr.takeRetainedValue() as? String, !name.isEmpty {
+                        if !names.contains(name) {
+                            names.append(name)
+                        }
+                    }
+                }
+                IOObjectRelease(device)
+                device = IOIteratorNext(iterator)
+            }
+            IOObjectRelease(iterator)
+        }
+
+        // Fallback: if IOKit returned nothing, try ioreg subprocess
+        if names.isEmpty {
+            if let output = runShell("ioreg -p IOUSB -l 2>/dev/null | grep 'USB Product Name'") {
+                for line in output.components(separatedBy: "\n") {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    guard let start = trimmed.range(of: "\"USB Product Name\" = \"") else { continue }
+                    let rest = trimmed[start.upperBound...]
+                    guard let end = rest.firstIndex(of: "\"") else { continue }
+                    let name = String(rest[..<end])
+                    if !name.isEmpty && !names.contains(name) {
+                        names.append(name)
+                    }
                 }
             }
-            IOObjectRelease(device)
-            device = IOIteratorNext(iterator)
         }
-        IOObjectRelease(iterator)
 
         return names
     }
