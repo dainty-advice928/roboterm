@@ -1,8 +1,6 @@
 import AppKit
 
 /// Handler for `input text` AppleScript command.
-/// Sends text to a terminal as if pasted.
-@MainActor
 @objc(RobotermScriptInputTextCommand)
 final class ScriptInputTextCommand: NSScriptCommand {
     override func performDefaultImplementation() -> Any? {
@@ -18,7 +16,9 @@ final class ScriptInputTextCommand: NSScriptCommand {
             return nil
         }
 
-        terminal.sendText(text)
+        MainActor.assumeIsolated {
+            terminal.sendText(text)
+        }
         return nil
     }
 }

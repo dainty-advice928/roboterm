@@ -68,6 +68,21 @@ class RobotermTerminal: LocalProcessTerminalView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
+    // MARK: - Key handling
+
+    /// Let Cmd+<key> shortcuts pass through to the menu bar instead of being
+    /// consumed by the terminal. Without this, SwiftTerm sends Cmd+N etc to
+    /// the shell process.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.command) {
+            // Let the main menu handle Cmd shortcuts
+            if let mainMenu = NSApp.mainMenu, mainMenu.performKeyEquivalent(with: event) {
+                return true
+            }
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
     deinit {
         Self.liveTerminals.remove(ObjectIdentifier(self))
         if Self.liveTerminals.isEmpty, let monitor = Self.sharedMouseMonitor {
