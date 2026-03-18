@@ -117,8 +117,8 @@ class RobotermTerminal: LocalProcessTerminalView {
                 return event
             }
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            // Cmd+key (no Ctrl) — dispatch directly to AppDelegate
-            if flags.contains(.command) && !flags.contains(.control),
+            // Cmd+key (no Ctrl, no Shift) — dispatch directly to AppDelegate
+            if flags.contains(.command) && !flags.contains(.control) && !flags.contains(.shift),
                let chars = event.charactersIgnoringModifiers,
                let action = cmdKeyActions[chars] {
                 if let appDelegate = AppDelegate.shared {
@@ -126,10 +126,12 @@ class RobotermTerminal: LocalProcessTerminalView {
                     return nil // consumed
                 }
             }
-            // Cmd+Shift+key combos (SSH, split down, etc.) — let the menu handle.
-            // Plain Cmd+key not in our map (C, V, A, etc.) passes through to SwiftTerm.
-            if flags.contains(.command) && flags.contains(.shift) {
-                if let mainMenu = NSApp.mainMenu, mainMenu.performKeyEquivalent(with: event) {
+            // Cmd+Shift combos (SSH, split down) and Cmd+number (tab switch) / Cmd+Q — menu handles.
+            // Cmd+C/V/A pass through to SwiftTerm for copy/paste/select.
+            if flags.contains(.command) {
+                let chars = event.charactersIgnoringModifiers ?? ""
+                let isEditKey = ["c", "v", "a"].contains(chars)
+                if !isEditKey, let mainMenu = NSApp.mainMenu, mainMenu.performKeyEquivalent(with: event) {
                     return nil
                 }
             }
