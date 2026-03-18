@@ -114,6 +114,9 @@ struct WorkspaceSidebar: View {
 
             Spacer()
 
+            // Docker containers section
+            DockerPanelView(tabManager: tabManager)
+
             // Hardware section
             Rectangle().fill(rfAccent.opacity(0.15)).frame(height: 1)
                 .padding(.horizontal, 8)
