@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200, initial-scale=1.0">
+<title>ROBOTERM Hero</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Oswald:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #050505;
+    color: #f3f3f3;
+    font-family: 'JetBrains Mono', monospace;
+    width: 1200px;
+    height: 630px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Scan lines */
+  body::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 59, 0, 0.015) 2px,
+      rgba(255, 59, 0, 0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* Top border line */
+  .top-line {
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, #FF3B00 20%, #FF3B00 80%, transparent 100%);
+    opacity: 0.6;
+  }
+
+  /* Header bar */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 40px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #FF3B00;
+    opacity: 0.5;
+    border-bottom: 1px solid rgba(255, 59, 0, 0.15);
+  }
+
+  /* Module badge */
+  .module-badge {
+    display: inline-block;
+    border: 1px solid #FF3B00;
+    padding: 4px 12px;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: #FF3B00;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* Main content */
+  .main {
+    text-align: center;
+    padding: 40px 40px 20px;
+  }
+
+  .subtitle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(255, 59, 0, 0.5);
+    margin-bottom: 8px;
+  }
+
+  .title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 72px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .title .accent {
+    color: #FF3B00;
+  }
+
+  .tagline {
+    font-family: 'Oswald', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: rgba(243, 243, 243, 0.5);
+    margin-bottom: 20px;
+  }
+
+  .description {
+    font-size: 12px;
+    line-height: 1.6;
+    color: rgba(243, 243, 243, 0.6);
+    max-width: 700px;
+    margin: 0 auto 30px;
+  }
+
+  /* Stats boxes */
+  .stats {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+
+  .stat-box {
+    border: 1px solid rgba(255, 59, 0, 0.3);
+    padding: 16px 28px;
+    text-align: center;
+    min-width: 140px;
+    background: rgba(255, 59, 0, 0.03);
+  }
+
+  .stat-value {
+    font-family: 'Oswald', sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: #FF3B00;
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(243, 243, 243, 0.4);
+    margin-top: 6px;
+  }
+
+  /* Tags */
+  .tags {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    background: #050505;
+    border: 1px solid rgba(255, 59, 0, 0.25);
+    color: rgba(243, 243, 243, 0.5);
+    padding: 4px 12px;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .tag.highlight {
+    border-color: #FF3B00;
+    color: #FF3B00;
+    background: rgba(255, 59, 0, 0.08);
+  }
+
+  /* Bottom status bar */
+  .bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 40px;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border-top: 1px solid rgba(255, 59, 0, 0.15);
+    color: rgba(243, 243, 243, 0.3);
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+
+  .status-dot.green { background: #00FF88; }
+  .status-dot.orange { background: #FF3B00; }
+  .status-dot.yellow { background: #FFB800; }
+
+  /* Corner decorations */
+  .corner-tl, .corner-tr, .corner-bl, .corner-br {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    opacity: 0.2;
+  }
+  .corner-tl { top: 8px; left: 8px; border-top: 2px solid #FF3B00; border-left: 2px solid #FF3B00; }
+  .corner-tr { top: 8px; right: 8px; border-top: 2px solid #FF3B00; border-right: 2px solid #FF3B00; }
+  .corner-bl { bottom: 8px; left: 8px; border-bottom: 2px solid #FF3B00; border-left: 2px solid #FF3B00; }
+  .corner-br { bottom: 8px; right: 8px; border-bottom: 2px solid #FF3B00; border-right: 2px solid #FF3B00; }
+</style>
+</head>
+<body>
+
+<div class="corner-tl"></div>
+<div class="corner-tr"></div>
+<div class="corner-bl"></div>
+<div class="corner-br"></div>
+
+<div class="top-line"></div>
+
+<div class="header">
+  <span>TOOL 01 — AGENTIC TERMINAL</span>
+  <span>UPSTREAM: GHOSTTYKIT &nbsp;&nbsp; PORT: ROBOTFLOW LABS</span>
+</div>
+
+<div class="main">
+  <div class="module-badge">ROBOTERM v0.1.0</div>
+
+  <div class="subtitle">The Terminal for Robotics Developers</div>
+
+  <h1 class="title">ROBO<span class="accent">TERM</span></h1>
+
+  <div class="tagline">ROS2-Native &bull; Agentic &bull; Apple Silicon &bull; 60fps Metal</div>
+
+  <p class="description">
+    The first terminal built for robotics developers. One-click Claude Code & Codex.<br>
+    60+ ROS2 commands. Docker integration. Zero overhead. Just your Mac.
+  </p>
+
+  <div class="stats">
+    <div class="stat-box">
+      <div class="stat-value">60+</div>
+      <div class="stat-label">ROS2 Commands</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value">2</div>
+      <div class="stat-label">AI Agents Built-in</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value">0</div>
+      <div class="stat-label">Electron Dependencies</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value">&lt;0.5%</div>
+      <div class="stat-label">CPU Overhead</div>
+    </div>
+  </div>
+
+  <div class="tags">
+    <span class="tag">GHOSTTYKIT</span>
+    <span class="tag">SWIFT</span>
+    <span class="tag">ROS2</span>
+    <span class="tag">METAL GPU</span>
+    <span class="tag">DOCKER</span>
+    <span class="tag highlight">APPLE SILICON</span>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <span><span class="status-dot green"></span>CLAUDE CODE: READY &nbsp;&nbsp; <span class="status-dot green"></span>CODEX: READY &nbsp;&nbsp; <span class="status-dot orange"></span>APPLESCRIPT: ENABLED</span>
+  <span><span class="status-dot yellow"></span>GHOSTTY: LATEST &nbsp;&nbsp; ROBOTFLOW LABS &bull; 2026</span>
+</div>
+
+</body>
+</html>
