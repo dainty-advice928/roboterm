@@ -9,13 +9,13 @@ import AppKit
 extension NSApplication {
     @objc(scriptWindows)
     var scriptWindows: [ScriptWindow] {
-        guard let appDelegate = delegate as? AppDelegate else { return [] }
+        guard let appDelegate = AppDelegate.shared else { return [] }
         return appDelegate.tabManagers.map { ScriptWindow(tabManager: $0) }
     }
 
     @objc(frontWindow)
     var frontWindow: ScriptWindow? {
-        guard let appDelegate = delegate as? AppDelegate else { return nil }
+        guard let appDelegate = AppDelegate.shared else { return nil }
         guard let mgr = appDelegate.focusedTabManager else { return scriptWindows.first }
         return ScriptWindow(tabManager: mgr)
     }
@@ -32,13 +32,13 @@ extension NSApplication {
 extension NSApplication {
     @objc(terminals)
     var terminals: [ScriptTerminal] {
-        guard let appDelegate = delegate as? AppDelegate else { return [] }
+        guard let appDelegate = AppDelegate.shared else { return [] }
         return appDelegate.tabManagers.flatMap { $0.tabs }.map { ScriptTerminal(tab: $0) }
     }
 
     @objc(valueInTerminalsWithUniqueID:)
     func valueInTerminals(uniqueID: String) -> ScriptTerminal? {
-        guard let appDelegate = delegate as? AppDelegate else { return nil }
+        guard let appDelegate = AppDelegate.shared else { return nil }
         return appDelegate.tabManagers
             .flatMap { $0.tabs }
             .first(where: { $0.id.uuidString == uniqueID })
@@ -52,7 +52,7 @@ extension NSApplication {
 extension NSApplication {
     @objc(handleNewWindowScriptCommand:)
     func handleNewWindowScriptCommand(_ command: NSScriptCommand) -> ScriptWindow? {
-        guard let appDelegate = delegate as? AppDelegate else {
+        guard let appDelegate = AppDelegate.shared else {
             command.scriptErrorNumber = errAEEventFailed
             command.scriptErrorString = "App delegate unavailable."
             return nil
@@ -91,7 +91,7 @@ extension NSApplication {
 
     @objc(handleNewTabScriptCommand:)
     func handleNewTabScriptCommand(_ command: NSScriptCommand) -> ScriptTab? {
-        guard let appDelegate = delegate as? AppDelegate else {
+        guard let appDelegate = AppDelegate.shared else {
             command.scriptErrorNumber = errAEEventFailed
             command.scriptErrorString = "App delegate unavailable."
             return nil

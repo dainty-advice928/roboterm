@@ -134,6 +134,19 @@ struct SSHConnectionConfig: Codable, Identifiable, Equatable {
         self.colorHex = colorHex
     }
 
+    /// Status of the configured SSH key file.
+    enum KeyStatus { case none, ok, missing, unreadable }
+
+    /// Check if the configured SSH key file exists and is readable.
+    var keyStatus: KeyStatus {
+        guard !keyPath.isEmpty else { return .none }
+        let expanded = NSString(string: keyPath).expandingTildeInPath
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: expanded) else { return .missing }
+        guard fm.isReadableFile(atPath: expanded) else { return .unreadable }
+        return .ok
+    }
+
     /// Build the arguments array for /usr/bin/ssh.
     var sshArgs: [String] {
         var args: [String] = []

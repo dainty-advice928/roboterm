@@ -95,8 +95,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.backgroundColor = TerminalSettings.shared.backgroundColor.withAlphaComponent(TerminalSettings.shared.backgroundOpacity)
         window.isOpaque = TerminalSettings.shared.backgroundOpacity >= 1.0
         window.delegate = self
+        // Set frame to full visible area without zoom animation (zoom animation
+        // can crash during dealloc if window state changes mid-animation).
+        if let screen = NSScreen.main {
+            window.setFrame(screen.visibleFrame, display: false)
+        }
         window.makeKeyAndOrderFront(nil)
-        window.zoom(nil)
 
         tabManager.window = window
     }
@@ -371,16 +375,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func hwJoy(_ sender: Any?) { runCommandInNewTab("ros2 topic echo /joy --once") }
     @objc func hwUsb(_ sender: Any?) { runCommandInNewTab("system_profiler SPUSBDataType") }
     @objc func hwSerial(_ sender: Any?) { runCommandInNewTab("ls -la /dev/tty.* /dev/cu.*") }
+    /// Returns the focused tab manager, creating a new window if none exists.
+    private func ensureTabManager() -> TabManager {
+        if let mgr = focusedTabManager { return mgr }
+        let mgr = TabManager()
+        createWindowForTabManager(mgr)
+        return mgr
+    }
+
     @objc func connectSSHFromMenu(_ sender: NSMenuItem) {
         guard let config = sender.representedObject as? SSHConnectionConfig else { return }
-        focusedTabManager?.createSSHTab(config: config)
+        ensureTabManager().createSSHTab(config: config)
     }
 
     @objc func hwSSH(_ sender: Any?) {
         // If SSH connections are configured, connect to the first one; otherwise open preferences
         let connections = TerminalSettings.shared.sshConnections
         if let first = connections.first, !first.host.isEmpty {
-            focusedTabManager?.createSSHTab(config: first)
+            ensureTabManager().createSSHTab(config: first)
         } else {
             openPreferences(nil)
         }

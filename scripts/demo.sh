@@ -2,6 +2,12 @@
 # ROBOTERM Demo Script — Run this to showcase features
 # Usage: source scripts/demo.sh
 
+# Must be sourced, not executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echo "Usage: source scripts/demo.sh"
+    exit 1
+fi
+
 # Colors
 O='\033[38;2;255;59;0m'
 G='\033[38;2;0;255;136m'
@@ -9,6 +15,7 @@ C='\033[38;2;0;221;255m'
 B='\033[1m'
 D='\033[2m'
 R='\033[0m'
+Y='\033[38;2;255;184;0m'
 
 clear
 
@@ -52,6 +59,7 @@ if ! type rt &>/dev/null; then
     echo -e "${Y}   Run: source $(cd "$(dirname "$0")" && pwd)/roboterm-tools.sh${R}"
     echo ""
 else
+    rt init 2>/dev/null
     rt doctor
 fi
 

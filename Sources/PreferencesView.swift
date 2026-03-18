@@ -743,6 +743,22 @@ struct SSHConnectionDetailView: View {
                         .textFieldStyle(.roundedBorder)
                     Button("Browse...") { pickKeyFile() }
                 }
+                switch connection.keyStatus {
+                case .ok:
+                    Label("Key found", systemImage: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.system(size: 11))
+                case .missing:
+                    Label("Key not found", systemImage: "xmark.circle.fill")
+                        .foregroundColor(.red)
+                        .font(.system(size: 11))
+                case .unreadable:
+                    Label("Key not readable", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundColor(.yellow)
+                        .font(.system(size: 11))
+                case .none:
+                    EmptyView()
+                }
             }
 
             if !connection.host.isEmpty {

@@ -13,7 +13,8 @@ struct StatusBarView: View {
     @State private var clock: String = ""
     @State private var cwd: String = "~"
     @State private var lastGitDir: String = ""
-    @State private var prevCpuTicks: (user: UInt64, system: UInt64, idle: UInt64) = (0, 0, 0)
+    private struct CpuTicks { var user: UInt64 = 0; var system: UInt64 = 0; var idle: UInt64 = 0 }
+    @State private var prevCpuTicks = CpuTicks()
 
     private let timer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
     private let clockTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -210,7 +211,7 @@ struct StatusBarView: View {
             let curIdle = UInt64(loadInfo.cpu_ticks.2)
 
             let prev = prevCpuTicks
-            prevCpuTicks = (curUser, curSystem, curIdle)
+            prevCpuTicks = CpuTicks(user: curUser, system: curSystem, idle: curIdle)
 
             // First reading — no delta yet, show "—"
             guard prev.user > 0 || prev.system > 0 || prev.idle > 0 else {

@@ -42,14 +42,24 @@ final class TabManager: ObservableObject {
             let workspace = addWorkspace(directory: dir)
             workspace.createTab()
         }
+        setupObservers()
+    }
 
+    /// Find the first tab matching `tabId` across all workspaces.
+    private func findTab(_ tabId: UUID) -> (Workspace, Tab)? {
+        for ws in workspaces {
+            if let tab = ws.tabs.first(where: { $0.id == tabId }) { return (ws, tab) }
+        }
+        return nil
+    }
+
+    private func setupObservers() {
         observers.append(NotificationCenter.default.addObserver(
             forName: .terminalViewDidFocus, object: nil, queue: .main
         ) { [weak self] notification in
             MainActor.assumeIsolated {
                 guard let self, let view = notification.object as? RobotermTerminal else { return }
                 let tabId = view.tabId
-                // Find the workspace containing this tab and update selection
                 for ws in self.workspaces where ws.tabs.contains(where: { $0.id == tabId }) {
                     if let layout = ws.splitLayout, layout.allTabIds.contains(tabId) {
                         ws.selectedTabId = tabId
@@ -59,7 +69,6 @@ final class TabManager: ObservableObject {
             }
         })
 
-        // Observe terminal title changes (OSC 0/2 sequences from the shell)
         observers.append(NotificationCenter.default.addObserver(
             forName: .terminalTitleChanged, object: nil, queue: .main
         ) { [weak self] notification in
@@ -67,23 +76,12 @@ final class TabManager: ObservableObject {
                 guard let self,
                       let info = notification.userInfo,
                       let tabId = info["tabId"] as? UUID,
-                      let title = info["title"] as? String else { return }
-                // Only update tabs that belong to this TabManager
-                for ws in self.workspaces {
-                    if let tab = ws.tabs.first(where: { $0.id == tabId }) {
-                        // Preserve [SSH] prefix for SSH tabs
-                        if tab.isSSH {
-                            tab.title = "[SSH] \(title)"
-                        } else {
-                            tab.title = title
-                        }
-                        break
-                    }
-                }
+                      let title = info["title"] as? String,
+                      let (_, tab) = self.findTab(tabId) else { return }
+                tab.title = tab.isSSH ? "[SSH] \(title)" : title
             }
         })
 
-        // Observe working directory changes (OSC 7 from the shell)
         observers.append(NotificationCenter.default.addObserver(
             forName: .terminalDirectoryChanged, object: nil, queue: .main
         ) { [weak self] notification in
@@ -91,25 +89,18 @@ final class TabManager: ObservableObject {
                 guard let self,
                       let info = notification.userInfo,
                       let tabId = info["tabId"] as? UUID,
-                      let directory = info["directory"] as? String else { return }
-                // Update the tab's current directory
-                for ws in self.workspaces {
-                    if let tab = ws.tabs.first(where: { $0.id == tabId }) {
-                        tab.currentDirectory = directory
-                        if !tab.hasReceivedInitialDirectory {
-                            tab.hasReceivedInitialDirectory = true
-                        }
-                        // Skip workspace regrouping for SSH tabs (remote dirs are irrelevant)
-                        if !tab.isSSH {
-                            self.handleDirectoryChange(tabId: tabId, directory: directory)
-                        }
-                        break
-                    }
+                      let directory = info["directory"] as? String,
+                      let (_, tab) = self.findTab(tabId) else { return }
+                tab.currentDirectory = directory
+                if !tab.hasReceivedInitialDirectory {
+                    tab.hasReceivedInitialDirectory = true
+                }
+                if !tab.isSSH {
+                    self.handleDirectoryChange(tabId: tabId, directory: directory)
                 }
             }
         })
 
-        // Observe process exit — auto-close local tabs, keep SSH tabs open
         observers.append(NotificationCenter.default.addObserver(
             forName: .terminalProcessExited, object: nil, queue: .main
         ) { [weak self] notification in
@@ -117,26 +108,14 @@ final class TabManager: ObservableObject {
                 guard let self,
                       let info = notification.userInfo,
                       let tabId = info["tabId"] as? UUID else { return }
-                // Only handle tabs belonging to this TabManager
-                let ownedTab = self.workspaces.contains { ws in
-                    ws.tabs.contains { $0.id == tabId }
-                }
-                guard ownedTab else { return }
+                guard let (_, tab) = self.findTab(tabId) else { return }
 
-                // SSH tabs: don't auto-close — let user see error/disconnect message
                 let isSSH = info["isSSH"] as? Bool ?? false
                 if isSSH {
-                    // Update title to show disconnected state
-                    for ws in self.workspaces {
-                        if let tab = ws.tabs.first(where: { $0.id == tabId }) {
-                            let label = tab.sshConfig?.label ?? "SSH"
-                            tab.title = "[SSH] \(label) — disconnected"
-                            break
-                        }
-                    }
+                    let label = tab.sshConfig?.label ?? "SSH"
+                    tab.title = "[SSH] \(label) — disconnected"
                     return
                 }
-
                 self.closeTab(tabId)
             }
         })

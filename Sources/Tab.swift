@@ -29,7 +29,7 @@ final class Tab: Identifiable, ObservableObject {
          sshConfig: SSHConnectionConfig? = nil) {
         self.id = id
         self.sshConfig = sshConfig
-        self.title = sshConfig != nil ? "[SSH] \(sshConfig!.label)" : title
+        self.title = sshConfig.map { "[SSH] \($0.label)" } ?? title
         self.initialWorkingDirectory = workingDirectory
     }
 
