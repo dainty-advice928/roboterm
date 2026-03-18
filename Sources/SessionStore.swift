@@ -1,11 +1,11 @@
 import Foundation
 
-/// Persists workspace/tab state to ~/.config/ghast/sessions.json on quit,
+/// Persists workspace/tab state to ~/.config/roboterm/sessions.json on quit,
 /// and restores it on next launch.
 @MainActor
 enum SessionStore {
     private static let configDir = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/ghast")
+        .appendingPathComponent(".config/roboterm")
     private static var sessionFile: URL { configDir.appendingPathComponent("sessions.json") }
 
     // MARK: - Codable models

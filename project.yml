@@ -1,4 +1,4 @@
-name: ghast
+name: roboterm
 options:
   bundleIdPrefix: com.robotflowlabs
   deploymentTarget:
@@ -8,14 +8,14 @@ options:
 
 settings:
   base:
-    SWIFT_OBJC_BRIDGING_HEADER: ghast-Bridging-Header.h
+    SWIFT_OBJC_BRIDGING_HEADER: roboterm-Bridging-Header.h
     MACOSX_DEPLOYMENT_TARGET: "13.0"
     SWIFT_VERSION: "5.9"
-    CODE_SIGN_ENTITLEMENTS: ghast.entitlements
+    CODE_SIGN_ENTITLEMENTS: roboterm.entitlements
     INFOPLIST_FILE: Resources/Info.plist
 
 targets:
-  ghast:
+  roboterm:
     type: application
     platform: macOS
     sources:

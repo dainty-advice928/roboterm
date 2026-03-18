@@ -296,7 +296,7 @@ final class GhosttyManager {
         case GHOSTTY_ACTION_DESKTOP_NOTIFICATION:
             let titlePtr = action.action.desktop_notification.title
             let bodyPtr = action.action.desktop_notification.body
-            let title = titlePtr.flatMap { String(cString: $0) } ?? "ghast"
+            let title = titlePtr.flatMap { String(cString: $0) } ?? "ROBOTERM"
             let body = bodyPtr.flatMap { String(cString: $0) } ?? ""
 
             let content = UNMutableNotificationContent()

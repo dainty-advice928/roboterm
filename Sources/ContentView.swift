@@ -141,7 +141,7 @@ struct WorkspaceItemView: View {
         workspace.selectedTab?.title ?? ""
     }
 
-    /// Short directory path for display (e.g. "~/Projects/ghast").
+    /// Short directory path for display (e.g. "~/Projects/roboterm").
     private var directoryLabel: String {
         let dir = workspace.selectedTab?.currentDirectory ?? workspace.directory
         let home = FileManager.default.homeDirectoryForCurrentUser.path

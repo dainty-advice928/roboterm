@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @main
-struct GhastApp: App {
+struct RobotermApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
