@@ -983,6 +983,70 @@ rt-dupes() {
 # ============================================================
 # rt — Main entry point / help
 # ============================================================
+# rt connect — Connect to ROS2 running in Docker container
+# ============================================================
+rt-connect() {
+    _rt_header "Docker ROS2 Bridge"
+    echo ""
+
+    local container="${1:-}"
+
+    # Auto-detect ROS2 container if not specified
+    if [ -z "$container" ]; then
+        container=$(docker ps --format '{{.Names}}' 2>/dev/null | while read name; do
+            docker exec "$name" test -f /opt/ros/jazzy/setup.bash 2>/dev/null && echo "$name" && break
+            docker exec "$name" test -f /opt/ros/humble/setup.bash 2>/dev/null && echo "$name" && break
+            docker exec "$name" bash -c "ls /opt/ros/*/setup.bash" 2>/dev/null | head -1 | grep -q setup && echo "$name" && break
+        done)
+    fi
+
+    if [ -z "$container" ]; then
+        _rt_err "No ROS2 container found"
+        _rt_dim "Start one: docker run -d --net host --name ros2 osrf/ros:jazzy-desktop bash -c 'sleep infinity'"
+        return 1
+    fi
+
+    _rt_ok "Found ROS2 container: $container"
+    echo ""
+
+    # Create a ros2 proxy function that executes inside the container
+    export ROBOTERM_ROS2_CONTAINER="$container"
+
+    # Override ros2 to run inside container
+    ros2() {
+        docker exec -i "$ROBOTERM_ROS2_CONTAINER" bash -c "source /opt/ros/*/setup.bash 2>/dev/null && ros2 $*" 2>/dev/null
+    }
+    export -f ros2
+
+    _rt_ok "ros2 commands now proxied to container: $container"
+    _rt_info "Try: rt nodes, rt topics, rt hz /robotflow/demo/heartbeat"
+    echo ""
+
+    # Show what's running
+    _rt_header "Connected — Live Status"
+    echo ""
+    local nodes=$(ros2 node list 2>/dev/null)
+    local topics=$(ros2 topic list 2>/dev/null)
+    local node_count=$(echo "$nodes" | grep -c "/" 2>/dev/null || echo "0")
+    local topic_count=$(echo "$topics" | grep -c "/" 2>/dev/null || echo "0")
+
+    _rt_ok "Nodes: $node_count"
+    echo "$nodes" | while read n; do [ -n "$n" ] && _rt_info "  $n"; done
+    echo ""
+    _rt_ok "Topics: $topic_count"
+    echo "$topics" | while read t; do [ -n "$t" ] && _rt_info "  $t"; done
+}
+
+# ============================================================
+# rt disconnect — Remove Docker ROS2 proxy
+# ============================================================
+rt-disconnect() {
+    unset ROBOTERM_ROS2_CONTAINER
+    unset -f ros2 2>/dev/null
+    _rt_ok "Disconnected from Docker ROS2"
+}
+
+# ============================================================
 rt() {
     local cmd="${1:-help}"
     case "$cmd" in
@@ -1014,6 +1078,8 @@ rt() {
         disk)       shift; rt-disk "$@" ;;
         log)        shift; rt-log "$@" ;;
         dupes)      shift; rt-dupes "$@" ;;
+        connect)    shift; rt-connect "$@" ;;
+        disconnect) shift; rt-disconnect "$@" ;;
         help|*)
             echo -e "${_RT_ORANGE}${_RT_BOLD}"
             echo "  ____   ___  ____   ___ _____ _____ ____  __  __ "
