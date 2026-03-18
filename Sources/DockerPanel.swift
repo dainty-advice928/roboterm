@@ -71,7 +71,7 @@ final class DockerState: ObservableObject {
         DispatchQueue.global(qos: .utility).async {
             let task = Process()
             task.launchPath = "/bin/bash"
-            task.arguments = ["-c", command]
+            task.arguments = ["-c", "export PATH=/usr/local/bin:/opt/homebrew/bin:$PATH && " + command]
             task.standardOutput = FileHandle.nullDevice
             task.standardError = FileHandle.nullDevice
             try? task.run()
@@ -85,7 +85,7 @@ final class DockerState: ObservableObject {
         let task = Process()
         let pipe = Pipe()
         task.launchPath = "/bin/bash"
-        task.arguments = ["-c", "docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}|{{.CreatedAt}}' 2>/dev/null"]
+        task.arguments = ["-c", "export PATH=/usr/local/bin:/opt/homebrew/bin:$PATH && docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}|{{.CreatedAt}}' 2>/dev/null"]
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
         do {

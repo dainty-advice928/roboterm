@@ -62,6 +62,23 @@ class RobotermTerminal: LocalProcessTerminalView {
     private func configureAppearance() {
         nativeBackgroundColor = TerminalSettings.shared.backgroundColor
         nativeForegroundColor = TerminalSettings.shared.foregroundColor
+
+        // Use a Nerd Font for Oh My Posh glyphs — try common ones
+        let nerdFonts = [
+            "JetBrainsMono Nerd Font",
+            "MesloLGS NF",
+            "FiraCode Nerd Font",
+            "Hack Nerd Font",
+            "JetBrains Mono",
+            "Menlo"
+        ]
+        let size = TerminalSettings.shared.fontSize
+        for fontName in nerdFonts {
+            if let f = NSFont(name: fontName, size: size) {
+                font = f
+                break
+            }
+        }
     }
 
     // MARK: - Shell startup

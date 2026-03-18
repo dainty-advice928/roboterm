@@ -117,7 +117,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         viewMenu.addItem(withTitle: "Previous Pane", action: #selector(previousPane(_:)), keyEquivalent: "[")
         viewMenu.items.last?.keyEquivalentModifierMask = [.command, .option]
         viewMenu.addItem(.separator())
-        viewMenu.addItem(withTitle: "Zoom In", action: #selector(zoomIn(_:)), keyEquivalent: "+")
+        viewMenu.addItem(withTitle: "Zoom In", action: #selector(zoomIn(_:)), keyEquivalent: "=")
         viewMenu.addItem(withTitle: "Zoom Out", action: #selector(zoomOut(_:)), keyEquivalent: "-")
         viewMenu.addItem(withTitle: "Reset Zoom", action: #selector(zoomReset(_:)), keyEquivalent: "0")
         viewMenu.addItem(.separator())
