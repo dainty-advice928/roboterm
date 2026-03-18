@@ -47,7 +47,13 @@ if ! type rt &>/dev/null; then
     source "$(dirname "$0")/roboterm-tools.sh" 2>/dev/null
 fi
 
-rt doctor
+if ! type rt &>/dev/null; then
+    echo -e "${Y}⚠  Could not auto-source rt tools.${R}"
+    echo -e "${Y}   Run: source $(cd "$(dirname "$0")" && pwd)/roboterm-tools.sh${R}"
+    echo ""
+else
+    rt doctor
+fi
 
 echo ""
 sleep 2

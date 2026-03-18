@@ -13,9 +13,15 @@ struct StatusBarView: View {
     @State private var clock: String = ""
     @State private var cwd: String = "~"
     @State private var lastGitDir: String = ""
+    @State private var prevCpuTicks: (user: UInt64, system: UInt64, idle: UInt64) = (0, 0, 0)
 
     private let timer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
     private let clockTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    private static let clockFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "HH:mm"
+        return fmt
+    }()
 
     /// Whether the currently selected tab is an SSH connection.
     private var isSSHTab: Bool {
@@ -187,7 +193,7 @@ struct StatusBarView: View {
     }
 
     private func updateSystemStats() {
-        // CPU via host_statistics (lightweight mach call)
+        // CPU via host_statistics — delta between readings for real-time usage
         var loadInfo = host_cpu_load_info_data_t()
         var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info_data_t>.size / MemoryLayout<integer_t>.size)
         let host = mach_host_self()
@@ -199,19 +205,37 @@ struct StatusBarView: View {
         }
 
         if result == KERN_SUCCESS {
-            let user = Double(loadInfo.cpu_ticks.0)
-            let system = Double(loadInfo.cpu_ticks.1)
-            let idle = Double(loadInfo.cpu_ticks.2)
-            let total = user + system + idle
-            if total > 0 {
-                let usage = ((user + system) / total) * 100
+            let curUser = UInt64(loadInfo.cpu_ticks.0)
+            let curSystem = UInt64(loadInfo.cpu_ticks.1)
+            let curIdle = UInt64(loadInfo.cpu_ticks.2)
+
+            let prev = prevCpuTicks
+            prevCpuTicks = (curUser, curSystem, curIdle)
+
+            // First reading — no delta yet, show "—"
+            guard prev.user > 0 || prev.system > 0 || prev.idle > 0 else {
+                cpuUsage = "—"
+                // fall through to memory
+                updateMemory(host: host)
+                return
+            }
+
+            let dUser = curUser - prev.user
+            let dSystem = curSystem - prev.system
+            let dIdle = curIdle - prev.idle
+            let dTotal = dUser + dSystem + dIdle
+            if dTotal > 0 {
+                let usage = Double(dUser + dSystem) / Double(dTotal) * 100
                 cpuUsage = String(format: "%.0f%%", usage)
             }
         } else {
             cpuUsage = "N/A"
         }
 
-        // Memory
+        updateMemory(host: host)
+    }
+
+    private func updateMemory(host: mach_port_t) {
         let totalMem = ProcessInfo.processInfo.physicalMemory
         let totalGB = Double(totalMem) / 1_073_741_824
         var vmStats = vm_statistics64_data_t()
@@ -236,8 +260,6 @@ struct StatusBarView: View {
     }
 
     private func updateClock() {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "HH:mm"
-        clock = fmt.string(from: Date())
+        clock = Self.clockFormatter.string(from: Date())
     }
 }

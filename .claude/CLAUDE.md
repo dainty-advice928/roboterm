@@ -25,7 +25,7 @@ xcodebuild -project roboterm.xcodeproj -scheme roboterm -configuration Debug bui
 ## Key Files
 | File | Purpose |
 |------|---------|
-| `GhastApp.swift` | App entry point (@main) |
+| `RobotermApp.swift` | App entry point (@main) |
 | `AppDelegate.swift` | Window management, menu actions, session mgmt |
 | `AppDelegate+Menu.swift` | Main menu construction (60+ commands) |
 | `ContentView.swift` | Sidebar + tab bar + terminal layout |
