@@ -112,18 +112,8 @@ struct WorkspaceSidebar: View {
 
             Spacer()
 
-            // Bottom: system label
-            Rectangle().fill(rfAccent.opacity(0.15)).frame(height: 1)
-                .padding(.horizontal, 8)
-            HStack(spacing: 4) {
-                Circle().fill(rfGreen).frame(width: 5, height: 5)
-                Text("SYSTEM: ONLINE")
-                    .font(.system(size: 8, weight: .medium, design: .monospaced))
-                    .foregroundColor(rfGreen.opacity(0.6))
-                    .tracking(0.5)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            // Hardware panel — bottom of sidebar
+            HardwarePanel()
         }
         .background(sidebarBg)
     }
