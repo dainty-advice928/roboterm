@@ -665,14 +665,9 @@ struct TerminalContainerView: NSViewRepresentable {
                 splitContainer = existing
             } else {
                 splitContainer = SplitContainerView(frame: container.bounds)
-                splitContainer.translatesAutoresizingMaskIntoConstraints = false
+                splitContainer.translatesAutoresizingMaskIntoConstraints = true
+                splitContainer.autoresizingMask = [.width, .height]
                 container.addSubview(splitContainer)
-                NSLayoutConstraint.activate([
-                    splitContainer.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-                    splitContainer.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                    splitContainer.topAnchor.constraint(equalTo: container.topAnchor),
-                    splitContainer.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-                ])
             }
 
             splitContainer.isHidden = false
@@ -700,14 +695,12 @@ struct TerminalContainerView: NSViewRepresentable {
 
             if terminalView.superview !== container {
                 terminalView.removeFromSuperview()
-                terminalView.translatesAutoresizingMaskIntoConstraints = false
+                // Use autoresizingMask instead of Auto Layout to avoid
+                // fighting SwiftUI's constraint system (per research findings)
+                terminalView.translatesAutoresizingMaskIntoConstraints = true
+                terminalView.autoresizingMask = [.width, .height]
+                terminalView.frame = container.bounds
                 container.addSubview(terminalView)
-                NSLayoutConstraint.activate([
-                    terminalView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-                    terminalView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                    terminalView.topAnchor.constraint(equalTo: container.topAnchor),
-                    terminalView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-                ])
             }
 
             // Hide other direct terminal views
