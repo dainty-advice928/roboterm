@@ -70,12 +70,19 @@ class RobotermTerminal: LocalProcessTerminalView {
 
     // MARK: - Key handling
 
+    /// Re-entry guard for performKeyEquivalent to prevent infinite recursion.
+    private static var isProcessingKeyEquivalent = false
+
     /// Let Cmd+<key> shortcuts pass through to the menu bar instead of being
     /// consumed by the terminal. Without this, SwiftTerm sends Cmd+N etc to
     /// the shell process.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard !Self.isProcessingKeyEquivalent else {
+            return super.performKeyEquivalent(with: event)
+        }
         if event.modifierFlags.contains(.command) {
-            // Let the main menu handle Cmd shortcuts
+            Self.isProcessingKeyEquivalent = true
+            defer { Self.isProcessingKeyEquivalent = false }
             if let mainMenu = NSApp.mainMenu, mainMenu.performKeyEquivalent(with: event) {
                 return true
             }

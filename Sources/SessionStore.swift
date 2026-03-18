@@ -120,17 +120,22 @@ enum SessionStore {
                 // Restore split layout if saved and tabs match
                 if let serialized = wsData.splitLayout,
                    let layout = SplitNode.deserialize(serialized) {
-                    // Remap deserialized tab IDs to actual restored tab IDs
-                    // (serialized IDs won't match since tabs get new UUIDs)
                     let deserializedIds = layout.allTabIds
                     if deserializedIds.count == ws.tabs.count && deserializedIds.count > 1 {
-                        // Replace each deserialized ID with the corresponding restored tab ID
+                        // Remap deserialized tab IDs to actual restored tab IDs
+                        var allRemapped = true
                         for (oldId, tab) in zip(deserializedIds, ws.tabs) {
                             if let leaf = layout.findLeaf(for: oldId) {
                                 leaf.content = .tab(tab.id)
+                            } else {
+                                allRemapped = false
+                                break
                             }
                         }
-                        ws.splitLayout = layout
+                        // Only apply layout if ALL leaves were successfully remapped
+                        if allRemapped {
+                            ws.splitLayout = layout
+                        }
                     }
                 }
             }
