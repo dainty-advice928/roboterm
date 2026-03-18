@@ -9,7 +9,7 @@ struct DockerContainer: Identifiable {
     let image: String
     let status: ContainerStatus
     let ports: String
-    let created: String
+    let project: String  // compose project name (empty if standalone)
 
     enum ContainerStatus {
         case running, stopped, paused
@@ -91,7 +91,7 @@ final class DockerState: ObservableObject {
         let task = Process()
         let pipe = Pipe()
         task.launchPath = "/bin/bash"
-        task.arguments = ["-c", "export PATH=/usr/local/bin:/opt/homebrew/bin:$PATH && docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}|{{.CreatedAt}}' 2>/dev/null"]
+        task.arguments = ["-c", "export PATH=/usr/local/bin:/opt/homebrew/bin:$PATH && docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}|{{.Label \"com.docker.compose.project\"}}' 2>/dev/null"]
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
         do {
@@ -117,7 +117,7 @@ final class DockerState: ObservableObject {
                 image: parts.count > 2 ? parts[2] : "",
                 status: status,
                 ports: parts.count > 4 ? parts[4] : "",
-                created: parts.count > 5 ? parts[5] : ""
+                project: parts.count > 5 ? parts[5] : ""
             )
         }
     }
@@ -164,21 +164,36 @@ struct DockerPanelView: View {
                     DockerEmptyState()
                 } else {
                     ScrollView(.vertical, showsIndicators: true) {
-                        VStack(spacing: 0) {
-                            ForEach(state.containers) { container in
-                                DockerContainerRow(
-                                    container: container,
-                                    onShell: { openShell(container) },
-                                    onLogs: { openLogs(container) },
-                                    onStart: { state.startContainer(container.id) },
-                                    onStop: { state.stopContainer(container.id) },
-                                    onRestart: { state.restartContainer(container.id) },
-                                    onRemove: { state.removeContainer(container.id) }
-                                )
+                        VStack(alignment: .leading, spacing: 0) {
+                            // Group by compose project
+                            let groups = Dictionary(grouping: state.containers) { $0.project.isEmpty ? "__standalone__" : $0.project }
+                            let sortedKeys = groups.keys.sorted { a, b in
+                                if a == "__standalone__" { return false }
+                                if b == "__standalone__" { return true }
+                                return a < b
+                            }
+
+                            ForEach(sortedKeys, id: \.self) { key in
+                                if key != "__standalone__" {
+                                    // Compose project group header
+                                    DockerGroupHeader(name: key, containers: groups[key] ?? [])
+                                }
+                                ForEach(groups[key] ?? []) { container in
+                                    DockerContainerRow(
+                                        container: container,
+                                        indented: key != "__standalone__",
+                                        onShell: { openShell(container) },
+                                        onLogs: { openLogs(container) },
+                                        onStart: { state.startContainer(container.id) },
+                                        onStop: { state.stopContainer(container.id) },
+                                        onRestart: { state.restartContainer(container.id) },
+                                        onRemove: { state.removeContainer(container.id) }
+                                    )
+                                }
                             }
                         }
                     }
-                    .frame(maxHeight: 250)
+                    .frame(maxHeight: 300)
                 }
             }
         }
@@ -264,8 +279,32 @@ private struct DockerEmptyState: View {
 
 // MARK: - Container Row
 
+// MARK: - Compose group header
+
+private struct DockerGroupHeader: View {
+    let name: String
+    let containers: [DockerContainer]
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "shippingbox")
+                .font(.system(size: 9))
+                .foregroundStyle(dpCyan.opacity(0.5))
+            Text(name)
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(dpCyan.opacity(0.7))
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Container Row
+
 private struct DockerContainerRow: View {
     let container: DockerContainer
+    var indented: Bool = false
     let onShell: () -> Void
     let onLogs: () -> Void
     let onStart: () -> Void
@@ -291,35 +330,26 @@ private struct DockerContainerRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
-            // Status indicator
-            Circle().fill(statusColor).frame(width: 6, height: 6)
+        HStack(spacing: 6) {
+            // Play/stop icon
+            Image(systemName: container.status == .running ? "play.fill" : "stop.fill")
+                .font(.system(size: 8))
+                .foregroundStyle(statusColor)
 
-            // Name + image
-            VStack(alignment: .leading, spacing: 2) {
-                Text(container.name)
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundStyle(isHovering ? dpCyan : .white.opacity(0.6))
-                    .lineLimit(1)
+            // Image name (bold) + container name (dim)
+            Text(shortImage)
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(isHovering ? dpCyan : .white.opacity(0.6))
+                .lineLimit(1)
 
-                HStack(spacing: 6) {
-                    Text(shortImage)
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.25))
-                        .lineLimit(1)
-
-                    if !container.ports.isEmpty {
-                        Text(container.ports)
-                            .font(.system(size: 8, design: .monospaced))
-                            .foregroundStyle(dpCyan.opacity(0.3))
-                            .lineLimit(1)
-                    }
-                }
-            }
+            Text(container.name)
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.25))
+                .lineLimit(1)
 
             Spacer()
 
-            // Action buttons (visible on hover)
+            // Action buttons on hover
             if isHovering {
                 ContainerActions(
                     status: container.status,
@@ -329,16 +359,11 @@ private struct DockerContainerRow: View {
                     onStop: onStop,
                     onRemove: onRemove
                 )
-            } else {
-                // Status label
-                Text(container.status.label)
-                    .font(.system(size: 7, weight: .bold, design: .monospaced))
-                    .foregroundStyle(statusColor.opacity(0.5))
-                    .tracking(0.5)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.leading, indented ? 24 : 12)
+        .padding(.trailing, 12)
+        .padding(.vertical, 4)
         .background(isHovering ? dpCyan.opacity(0.04) : Color.clear)
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
