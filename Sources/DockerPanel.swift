@@ -137,7 +137,7 @@ private let dpBg      = Color(red: 0x08/255, green: 0x08/255, blue: 0x08/255)
 struct DockerPanelView: View {
     @ObservedObject private var state = DockerState.shared
     @ObservedObject var tabManager: TabManager
-    @State private var isExpanded = false
+    @State private var isExpanded = true
 
     private var runningCount: Int {
         state.containers.filter { $0.status == .running }.count
@@ -166,19 +166,19 @@ struct DockerPanelView: View {
                     ScrollView(.vertical, showsIndicators: true) {
                         VStack(spacing: 0) {
                             ForEach(state.containers) { container in
-                            DockerContainerRow(
-                                container: container,
-                                onShell: { openShell(container) },
-                                onLogs: { openLogs(container) },
-                                onStart: { state.startContainer(container.id) },
-                                onStop: { state.stopContainer(container.id) },
-                                onRestart: { state.restartContainer(container.id) },
-                                onRemove: { state.removeContainer(container.id) }
-                            )
+                                DockerContainerRow(
+                                    container: container,
+                                    onShell: { openShell(container) },
+                                    onLogs: { openLogs(container) },
+                                    onStart: { state.startContainer(container.id) },
+                                    onStop: { state.stopContainer(container.id) },
+                                    onRestart: { state.restartContainer(container.id) },
+                                    onRemove: { state.removeContainer(container.id) }
+                                )
+                            }
                         }
                     }
-                }
-                .frame(maxHeight: 250)
+                    .frame(maxHeight: 250)
                 }
             }
         }
