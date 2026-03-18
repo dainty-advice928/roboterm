@@ -13,15 +13,6 @@
         <cocoa key="frontWindow"/>
       </property>
       <property name="version" code="vers" type="text" access="r" description="The version number of the application."/>
-      <responds-to command="new window">
-        <cocoa method="handleNewWindowScriptCommand:"/>
-      </responds-to>
-      <responds-to command="new tab">
-        <cocoa method="handleNewTabScriptCommand:"/>
-      </responds-to>
-      <responds-to command="quit">
-        <cocoa method="handleQuitScriptCommand:"/>
-      </responds-to>
 
       <element type="window" access="r">
         <cocoa key="scriptWindows"/>
@@ -111,6 +102,7 @@
     </enumeration>
 
     <command name="new window" code="RBTmNWin" description="Create a new ROBOTERM window.">
+      <cocoa class="RobotermScriptNewWindowCommand"/>
       <parameter name="with configuration" code="RNwS" type="surface configuration" optional="yes" description="Configuration for initial terminal.">
         <cocoa key="configuration"/>
       </parameter>
@@ -118,6 +110,7 @@
     </command>
 
     <command name="new tab" code="RBTmNTab" description="Create a new tab.">
+      <cocoa class="RobotermScriptNewTabCommand"/>
       <parameter name="in" code="RNtW" type="window" optional="yes" description="Target window.">
         <cocoa key="window"/>
       </parameter>
@@ -187,7 +180,7 @@
     </command>
 
     <command name="quit" code="aevtquit" description="Quit the application.">
-      <cocoa class="NSQuitCommand"/>
+      <cocoa class="RobotermScriptQuitCommand"/>
     </command>
   </suite>
 </dictionary>

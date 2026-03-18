@@ -7,7 +7,7 @@
 # ROBOTERM — ROS2 Developer Tools
 # ============================================================
 
-export ROBOTERM_VERSION="0.3.5"
+export ROBOTERM_VERSION="0.5.0"
 
 # Colors
 _RT_ORANGE='\033[38;2;255;59;0m'

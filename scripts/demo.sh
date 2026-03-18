@@ -46,6 +46,7 @@ echo ""
 sleep 2
 
 echo -e "${O}━━━ DEMO: rt doctor ━━━${R}"
+echo -e "${D}  (System diagnostics — warnings expected without ROS2/Docker installed)${R}"
 echo ""
 sleep 1
 
