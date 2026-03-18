@@ -14,36 +14,44 @@ private let rfDim      = Color.white.opacity(0.3)
 // MARK: - Device model
 
 struct HardwareDevice: Identifiable {
-    let id = UUID()
+    let id: String        // stable ID based on name
     let name: String
     let type: DeviceType
-    let status: DeviceStatus
+    var status: DeviceStatus
     let detail: String
 
-    enum DeviceType {
+    enum DeviceType: String, Codable {
         case camera, lidar, imu, compute, gamepad, serial
     }
 
     enum DeviceStatus {
-        case connected, disconnected, error
+        case connected, disconnected
     }
+
+    init(name: String, type: DeviceType, status: DeviceStatus, detail: String) {
+        self.id = name
+        self.name = name
+        self.type = type
+        self.status = status
+        self.detail = detail
+    }
+}
+
+// MARK: - Network host config (loaded from ~/.config/roboterm/hosts.json)
+
+struct NetworkHost: Codable {
+    let name: String
+    let host: String       // IP or hostname
+    let type: String       // "jetson", "rpi", "server", "robot"
 }
 
 // MARK: - Hardware Panel View
 
 struct HardwarePanel: View {
-    @State private var devices: [HardwareDevice] = knownDevices
+    @State private var devices: [HardwareDevice] = []
     @State private var isScanning = false
 
     private let scanTimer = Timer.publish(every: 15, on: .main, in: .common).autoconnect()
-
-    /// Pre-populated device registry — always visible, status updated by scan.
-    /// Add your hardware here so it always shows in the sidebar.
-    private static let knownDevices: [HardwareDevice] = [
-        HardwareDevice(name: "ZED 2i", type: .camera, status: .disconnected, detail: "Stereolabs Depth Camera"),
-        HardwareDevice(name: "JETSON", type: .compute, status: .disconnected, detail: "NVIDIA Jetson (jetson.local)"),
-        HardwareDevice(name: "ANIMA-MOTHER", type: .compute, status: .disconnected, detail: "Mac Mini M4 Pro (192.168.1.110)"),
-    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -71,10 +79,9 @@ struct HardwarePanel: View {
             .padding(.bottom, 4)
 
             // Device list
-            if devices.isEmpty {
+            if devices.isEmpty && !isScanning {
                 HStack(spacing: 4) {
-                    Circle().fill(rfDim).frame(width: 4, height: 4)
-                    Text("NO DEVICES")
+                    Text("SCANNING...")
                         .font(.system(size: 8, weight: .medium, design: .monospaced))
                         .foregroundColor(rfDim)
                         .tracking(1)
@@ -91,14 +98,16 @@ struct HardwarePanel: View {
             Rectangle().fill(rfAccent.opacity(0.1)).frame(height: 1)
                 .padding(.horizontal, 8)
                 .padding(.top, 4)
+
+            let connectedCount = devices.filter { $0.status == .connected }.count
             HStack(spacing: 4) {
-                Circle().fill(rfGreen).frame(width: 5, height: 5)
-                Text("SYSTEM: ONLINE")
+                Circle().fill(connectedCount > 0 ? rfGreen : rfDim).frame(width: 5, height: 5)
+                Text(connectedCount > 0 ? "SYSTEM: ONLINE" : "SYSTEM: IDLE")
                     .font(.system(size: 8, weight: .medium, design: .monospaced))
-                    .foregroundColor(rfGreen.opacity(0.6))
+                    .foregroundColor(connectedCount > 0 ? rfGreen.opacity(0.6) : rfDim)
                     .tracking(0.5)
                 Spacer()
-                Text("\(devices.filter { $0.status == .connected }.count)/\(devices.count)")
+                Text("\(connectedCount)/\(devices.count)")
                     .font(.system(size: 8, weight: .bold, design: .monospaced))
                     .foregroundColor(rfAccent.opacity(0.5))
             }
@@ -116,148 +125,165 @@ struct HardwarePanel: View {
         isScanning = true
         DispatchQueue.global(qos: .utility).async {
             let found = Self.detectDevices()
-            let foundNames = Set(found.map { $0.name })
 
             DispatchQueue.main.async {
-                // Merge: update status of known devices, add new ones
-                var updated: [HardwareDevice] = []
+                // Merge: keep all previously seen devices, update their status
+                var registry: [String: HardwareDevice] = [:]
 
-                // Update existing devices
+                // Keep all existing devices (mark disconnected by default)
                 for device in self.devices {
-                    if foundNames.contains(device.name) {
-                        // Still connected
-                        updated.append(HardwareDevice(
-                            name: device.name, type: device.type,
-                            status: .connected, detail: device.detail
-                        ))
-                    } else {
-                        // Not found this scan — mark disconnected but keep in list
-                        updated.append(HardwareDevice(
-                            name: device.name, type: device.type,
-                            status: .disconnected, detail: device.detail
-                        ))
+                    registry[device.name] = HardwareDevice(
+                        name: device.name, type: device.type,
+                        status: .disconnected, detail: device.detail
+                    )
+                }
+
+                // Update/add found devices as connected
+                for device in found {
+                    registry[device.name] = HardwareDevice(
+                        name: device.name, type: device.type,
+                        status: .connected, detail: device.detail
+                    )
+                }
+
+                // Sort: connected first, then by type, then alphabetical
+                let sorted = registry.values.sorted { a, b in
+                    if a.status != b.status {
+                        return a.status == .connected
                     }
+                    if a.type.rawValue != b.type.rawValue {
+                        return a.type.rawValue < b.type.rawValue
+                    }
+                    return a.name < b.name
                 }
 
-                // Add newly discovered devices not in the registry
-                let existingNames = Set(updated.map { $0.name })
-                for device in found where !existingNames.contains(device.name) {
-                    updated.append(device)
-                }
-
-                self.devices = updated
+                self.devices = Array(sorted)
                 self.isScanning = false
             }
         }
     }
 
-    /// Detect connected hardware via system_profiler and /dev
+    // MARK: - Auto-detect all hardware
+
     static func detectDevices() -> [HardwareDevice] {
         var results: [HardwareDevice] = []
 
-        // USB devices via system_profiler
-        if let usbOutput = Self.runShell("system_profiler SPUSBDataType 2>/dev/null") {
-            // ZED cameras
-            if usbOutput.contains("ZED") || usbOutput.contains("Stereolabs") {
-                let model = usbOutput.contains("ZED 2i") ? "ZED 2i" :
-                            usbOutput.contains("ZED 2") ? "ZED 2" :
-                            usbOutput.contains("ZED Mini") ? "ZED Mini" :
-                            usbOutput.contains("ZED X") ? "ZED X" : "ZED"
+        // 1. Cameras via SPCameraDataType
+        if let camOutput = runShell("system_profiler SPCameraDataType 2>/dev/null") {
+            if camOutput.contains("MacBook") || camOutput.contains("FaceTime") {
                 results.append(HardwareDevice(
-                    name: model, type: .camera, status: .connected,
-                    detail: "Stereolabs Depth Camera"
+                    name: "MacBook Camera", type: .camera, status: .connected,
+                    detail: "Built-in Camera"
                 ))
             }
-
-            // Intel RealSense
-            if usbOutput.contains("RealSense") || usbOutput.contains("Intel(R) RealSense") {
-                let model = usbOutput.contains("D435") ? "D435" :
-                            usbOutput.contains("D455") ? "D455" :
-                            usbOutput.contains("L515") ? "L515" :
-                            usbOutput.contains("T265") ? "T265" : "RealSense"
+            if camOutput.contains("iPhone") {
                 results.append(HardwareDevice(
-                    name: "RealSense \(model)", type: .camera, status: .connected,
-                    detail: "Intel Depth Camera"
+                    name: "iPhone Camera", type: .camera, status: .connected,
+                    detail: "Continuity Camera"
                 ))
             }
+        }
 
-            // Generic webcams
-            if usbOutput.contains("FaceTime") || usbOutput.contains("Webcam") || usbOutput.contains("Camera") {
-                if !results.contains(where: { $0.type == .camera }) {
+        // 2. USB devices via ioreg (sandbox-safe)
+        if let usbOutput = runShell("ioreg -p IOUSB -l 2>/dev/null | grep 'USB Product Name'") {
+            let lines = usbOutput.components(separatedBy: "\n")
+
+            for line in lines {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                guard let nameRange = trimmed.range(of: "\"USB Product Name\" = \"") else { continue }
+                let afterPrefix = trimmed[nameRange.upperBound...]
+                guard let endQuote = afterPrefix.firstIndex(of: "\"") else { continue }
+                let productName = String(afterPrefix[..<endQuote])
+
+                // Skip HID interfaces (they're sub-devices)
+                if productName.contains("HID") { continue }
+                // Skip hubs
+                if productName.contains("Hub") { continue }
+                // Skip monitor controls
+                if productName.contains("Monitor") || productName.contains("Controls") { continue }
+
+                // Classify the device
+                let device: HardwareDevice
+                if productName.contains("ZED") || productName.contains("Stereolabs") {
+                    device = HardwareDevice(name: productName, type: .camera, status: .connected, detail: "Stereolabs Depth Camera")
+                } else if productName.contains("RealSense") {
+                    device = HardwareDevice(name: productName, type: .camera, status: .connected, detail: "Intel Depth Camera")
+                } else if productName.contains("Webcam") || productName.contains("Camera") || productName.contains("Cam") {
+                    device = HardwareDevice(name: productName, type: .camera, status: .connected, detail: "USB Camera")
+                } else if productName.contains("Velodyne") || productName.contains("Ouster") || productName.contains("Livox") || productName.contains("RPLIDAR") || productName.contains("Hokuyo") || productName.contains("LiDAR") {
+                    device = HardwareDevice(name: productName, type: .lidar, status: .connected, detail: "LiDAR Sensor")
+                } else if productName.contains("IMU") || productName.contains("Bosch") || productName.contains("ICM") || productName.contains("MPU") {
+                    device = HardwareDevice(name: productName, type: .imu, status: .connected, detail: "Inertial Measurement Unit")
+                } else if productName.contains("Joystick") || productName.contains("Gamepad") || productName.contains("Controller") || productName.contains("Xbox") || productName.contains("DualSense") {
+                    device = HardwareDevice(name: productName, type: .gamepad, status: .connected, detail: "Game Controller")
+                } else {
+                    // Generic USB device — still show it
+                    device = HardwareDevice(name: productName, type: .serial, status: .connected, detail: "USB Device")
+                }
+
+                // Deduplicate by name
+                if !results.contains(where: { $0.name == device.name }) {
+                    results.append(device)
+                }
+            }
+        }
+
+        // 3. Serial ports
+        if let serialOutput = runShell("ls /dev/tty.usb* /dev/cu.usb* 2>/dev/null") {
+            for line in serialOutput.split(separator: "\n").prefix(5) {
+                let name = String(line).components(separatedBy: "/").last ?? "Serial"
+                if !results.contains(where: { $0.name == name }) {
                     results.append(HardwareDevice(
-                        name: "USB Camera", type: .camera, status: .connected,
-                        detail: "Generic USB Camera"
+                        name: name, type: .serial, status: .connected, detail: String(line)
                     ))
                 }
             }
-
-            // LiDAR sensors
-            if usbOutput.contains("Velodyne") || usbOutput.contains("Ouster") || usbOutput.contains("Livox") || usbOutput.contains("RPLIDAR") || usbOutput.contains("Hokuyo") {
-                let name = usbOutput.contains("Velodyne") ? "Velodyne" :
-                           usbOutput.contains("Ouster") ? "Ouster" :
-                           usbOutput.contains("Livox") ? "Livox" :
-                           usbOutput.contains("RPLIDAR") ? "RPLIDAR" : "Hokuyo"
-                results.append(HardwareDevice(
-                    name: name, type: .lidar, status: .connected,
-                    detail: "LiDAR Sensor"
-                ))
-            }
-
-            // IMU
-            if usbOutput.contains("IMU") || usbOutput.contains("Bosch") || usbOutput.contains("MPU") || usbOutput.contains("ICM") {
-                results.append(HardwareDevice(
-                    name: "IMU", type: .imu, status: .connected,
-                    detail: "Inertial Measurement Unit"
-                ))
-            }
-
-            // Gamepad/Joystick
-            if usbOutput.contains("Joystick") || usbOutput.contains("Gamepad") || usbOutput.contains("Controller") || usbOutput.contains("Xbox") || usbOutput.contains("DualSense") || usbOutput.contains("Pro Controller") {
-                results.append(HardwareDevice(
-                    name: "Gamepad", type: .gamepad, status: .connected,
-                    detail: "Game Controller"
-                ))
-            }
         }
 
-        // Serial devices
-        if let serialOutput = Self.runShell("ls /dev/tty.usb* /dev/cu.usb* 2>/dev/null") {
-            let lines = serialOutput.split(separator: "\n")
-            for line in lines.prefix(3) {
-                let name = String(line).components(separatedBy: "/").last ?? "Serial"
+        // 4. Network hosts from config file (~/.config/roboterm/hosts.json)
+        let hosts = loadNetworkHosts()
+        for host in hosts {
+            if canReachHost(host.host) {
                 results.append(HardwareDevice(
-                    name: name, type: .serial, status: .connected,
-                    detail: String(line)
+                    name: host.name, type: .compute, status: .connected,
+                    detail: "\(host.type) (\(host.host))"
                 ))
             }
-        }
-
-        // Check for Jetson via SSH/mDNS (quick check)
-        if Self.canReachHost("jetson.local") || Self.canReachHost("192.168.1.100") {
-            results.append(HardwareDevice(
-                name: "JETSON", type: .compute, status: .connected,
-                detail: "NVIDIA Jetson (network)"
-            ))
-        }
-
-        // Check for Raspberry Pi
-        if Self.canReachHost("raspberrypi.local") {
-            results.append(HardwareDevice(
-                name: "RPI", type: .compute, status: .connected,
-                detail: "Raspberry Pi (network)"
-            ))
-        }
-
-        // Check for ANIMA Mac Mini
-        if Self.canReachHost("192.168.1.110") {
-            results.append(HardwareDevice(
-                name: "ANIMA-MOTHER", type: .compute, status: .connected,
-                detail: "Mac Mini M4 Pro (192.168.1.110)"
-            ))
         }
 
         return results
     }
+
+    // MARK: - Network hosts config
+
+    /// Load network hosts from ~/.config/roboterm/hosts.json
+    /// Format: [{"name": "JETSON", "host": "jetson.local", "type": "jetson"}, ...]
+    static func loadNetworkHosts() -> [NetworkHost] {
+        let configDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config/roboterm")
+        let hostsFile = configDir.appendingPathComponent("hosts.json")
+
+        // Create default config if it doesn't exist
+        if !FileManager.default.fileExists(atPath: hostsFile.path) {
+            let defaultHosts: [NetworkHost] = [
+                NetworkHost(name: "JETSON", host: "jetson.local", type: "jetson"),
+                NetworkHost(name: "ANIMA-MOTHER", host: "192.168.1.110", type: "server"),
+            ]
+            try? FileManager.default.createDirectory(at: configDir, withIntermediateDirectories: true)
+            if let data = try? JSONEncoder().encode(defaultHosts) {
+                try? data.write(to: hostsFile)
+            }
+            return defaultHosts
+        }
+
+        guard let data = try? Data(contentsOf: hostsFile),
+              let hosts = try? JSONDecoder().decode([NetworkHost].self, from: data) else {
+            return []
+        }
+        return hosts
+    }
+
+    // MARK: - Shell helpers
 
     private static func runShell(_ command: String) -> String? {
         let task = Process()
@@ -270,14 +296,14 @@ struct HardwarePanel: View {
             try task.run()
             task.waitUntilExit()
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            return String(data: data, encoding: .utf8)
+            let output = String(data: data, encoding: .utf8)
+            return (output?.isEmpty ?? true) ? nil : output
         } catch {
             return nil
         }
     }
 
     private static func canReachHost(_ host: String) -> Bool {
-        // Quick ping with 1s timeout
         let task = Process()
         task.launchPath = "/sbin/ping"
         task.arguments = ["-c", "1", "-W", "1000", host]
@@ -285,7 +311,6 @@ struct HardwarePanel: View {
         task.standardError = FileHandle.nullDevice
         do {
             try task.run()
-            // Set a watchdog timer — kill if it takes too long
             let deadline = DispatchTime.now() + .seconds(2)
             DispatchQueue.global().asyncAfter(deadline: deadline) {
                 if task.isRunning { task.terminate() }
@@ -308,18 +333,17 @@ struct DeviceRow: View {
         switch device.status {
         case .connected: return rfGreen
         case .disconnected: return rfDim
-        case .error: return rfRed
         }
     }
 
     private var typeIcon: String {
         switch device.type {
-        case .camera: return "\u{25A3}"    // filled square with inner square
-        case .lidar: return "\u{25CE}"     // bullseye
-        case .imu: return "\u{2316}"       // position indicator
-        case .compute: return "\u{2395}"   // APL quad
-        case .gamepad: return "\u{2318}"   // command key
-        case .serial: return "\u{2192}"    // arrow
+        case .camera: return "\u{25A3}"
+        case .lidar: return "\u{25CE}"
+        case .imu: return "\u{2316}"
+        case .compute: return "\u{2395}"
+        case .gamepad: return "\u{2318}"
+        case .serial: return "\u{2192}"
         }
     }
 
@@ -334,30 +358,37 @@ struct DeviceRow: View {
         }
     }
 
+    private var deviceTypeLabel: String {
+        switch device.type {
+        case .camera: return "CAM"
+        case .lidar: return "LDR"
+        case .imu: return "IMU"
+        case .compute: return "SBC"
+        case .gamepad: return "JOY"
+        case .serial: return "USB"
+        }
+    }
+
     var body: some View {
         HStack(spacing: 6) {
-            // Status dot
             Circle()
                 .fill(statusColor)
                 .frame(width: 5, height: 5)
 
-            // Type icon
             Text(typeIcon)
                 .font(.system(size: 9))
-                .foregroundColor(typeColor)
+                .foregroundColor(device.status == .connected ? typeColor : rfDim)
 
-            // Name
             Text(device.name.uppercased())
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundColor(isHovering ? typeColor : .white.opacity(0.6))
+                .foregroundColor(device.status == .connected ? (isHovering ? typeColor : .white.opacity(0.6)) : rfDim)
                 .lineLimit(1)
 
             Spacer()
 
-            // Type label
             Text(deviceTypeLabel)
                 .font(.system(size: 7, weight: .medium, design: .monospaced))
-                .foregroundColor(typeColor.opacity(0.5))
+                .foregroundColor(device.status == .connected ? typeColor.opacity(0.5) : rfDim.opacity(0.5))
                 .tracking(0.5)
         }
         .padding(.horizontal, 12)
@@ -366,16 +397,5 @@ struct DeviceRow: View {
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
         .help(device.detail)
-    }
-
-    private var deviceTypeLabel: String {
-        switch device.type {
-        case .camera: return "CAM"
-        case .lidar: return "LDR"
-        case .imu: return "IMU"
-        case .compute: return "SBC"
-        case .gamepad: return "JOY"
-        case .serial: return "SER"
-        }
     }
 }
