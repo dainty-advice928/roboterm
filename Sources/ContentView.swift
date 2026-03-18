@@ -68,19 +68,33 @@ struct ContentView: View {
 struct WorkspaceSidebar: View {
     @ObservedObject var tabManager: TabManager
 
-    private var sidebarBg: Color { rfDarkGray }
+    private let sidebarBg = Color(red: 0x08/255, green: 0x08/255, blue: 0x08/255) // near-black
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer().frame(height: 8)
+            // Header
+            HStack {
+                Text("WORKSPACES")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(rfAccent.opacity(0.6))
+                    .tracking(1.5)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
 
-            // + Workspace at top
+            // + Workspace button
             WorkspaceAddButton(tabManager: tabManager)
-            .padding(.horizontal, 8)
-            .padding(.bottom, 2)
+                .padding(.horizontal, 6)
+                .padding(.bottom, 4)
+
+            // Divider
+            Rectangle().fill(rfAccent.opacity(0.15)).frame(height: 1)
+                .padding(.horizontal, 8)
 
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 4) {
+                VStack(spacing: 2) {
                     ForEach(tabManager.workspaces) { workspace in
                         WorkspaceItemView(
                             workspace: workspace,
@@ -92,10 +106,24 @@ struct WorkspaceSidebar: View {
                         )
                     }
                 }
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 6)
+                .padding(.top, 6)
             }
 
             Spacer()
+
+            // Bottom: system label
+            Rectangle().fill(rfAccent.opacity(0.15)).frame(height: 1)
+                .padding(.horizontal, 8)
+            HStack(spacing: 4) {
+                Circle().fill(rfGreen).frame(width: 5, height: 5)
+                Text("SYSTEM: ONLINE")
+                    .font(.system(size: 8, weight: .medium, design: .monospaced))
+                    .foregroundColor(rfGreen.opacity(0.6))
+                    .tracking(0.5)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
         }
         .background(sidebarBg)
     }
@@ -112,15 +140,20 @@ struct WorkspaceAddButton: View {
             ws.createTab()
         }) {
             HStack(spacing: 4) {
-                Image(systemName: "plus")
-                    .font(.system(size: 10, weight: .medium))
-                Text("Workspace")
-                    .font(.system(size: 11, weight: .medium))
+                Text("+")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                Text("NEW WORKSPACE")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .tracking(0.5)
             }
-            .foregroundColor(isHovering ? rfAccent : .white.opacity(0.3))
+            .foregroundColor(isHovering ? rfAccent : .white.opacity(0.25))
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                Rectangle()
+                    .stroke(isHovering ? rfAccent.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 1)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -155,10 +188,9 @@ struct WorkspaceItemView: View {
     var body: some View {
         HStack(spacing: 0) {
             // Accent indicator bar for selected workspace
-            RoundedRectangle(cornerRadius: 1.5)
+            Rectangle()
                 .fill(isSelected ? rfAccent : Color.clear)
-                .frame(width: 3, height: 24)
-                .padding(.trailing, 8)
+                .frame(width: 3)
 
             VStack(alignment: .leading, spacing: 2) {
                 if isEditing {
@@ -168,25 +200,26 @@ struct WorkspaceItemView: View {
                         isEditing = false
                     })
                     .textFieldStyle(.plain)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundColor(.white.opacity(0.9))
                     .lineLimit(1)
                     .onExitCommand {
                         isEditing = false
                     }
                 } else {
-                    Text(workspace.displayName)
-                        .font(.system(size: 11, weight: .medium))
+                    Text(workspace.displayName.uppercased())
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .lineLimit(1)
-                        .foregroundColor(isSelected ? .white.opacity(0.9) : .white.opacity(0.55))
+                        .foregroundColor(isSelected ? rfAccent : .white.opacity(0.5))
                 }
 
                 Text(directoryLabel)
-                    .font(.system(size: 10))
+                    .font(.system(size: 9, design: .monospaced))
                     .lineLimit(1)
                     .truncationMode(.middle)
-                    .foregroundColor(isSelected ? .white.opacity(0.4) : .white.opacity(0.22))
+                    .foregroundColor(isSelected ? .white.opacity(0.35) : .white.opacity(0.18))
             }
+            .padding(.leading, 8)
 
             Spacer()
 
@@ -201,18 +234,21 @@ struct WorkspaceItemView: View {
                 .buttonStyle(.plain)
             } else {
                 Text("\(workspace.tabs.count)")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.22))
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(isSelected ? rfAccent.opacity(0.5) : .white.opacity(0.15))
             }
         }
-        .padding(.horizontal, 8)
+        .padding(.trailing, 8)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? Color.white.opacity(0.06) : isHovering ? Color.white.opacity(0.03) : Color.clear)
+            Rectangle()
+                .fill(isSelected ? rfAccent.opacity(0.06) : isHovering ? Color.white.opacity(0.03) : Color.clear)
         )
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Color.white.opacity(0.04)).frame(height: 1)
+        }
         .onHover { isHovering = $0 }
         .onTapGesture(count: 2) {
             editText = workspace.customName ?? workspace.displayName
