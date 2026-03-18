@@ -66,7 +66,7 @@ One-click launch for AI coding agents directly from the toolbar:
 - **ROS2 submenu**: nodes, topics, services, doctor, TF tree, topic Hz
 - **Launch Agent submenu**: Claude Code, Codex
 
-### CLI Tools (14 commands)
+### CLI Tools (25 commands)
 Add to your `~/.bashrc` or `~/.zshrc`:
 ```bash
 # Auto-source ROBOTERM tools when running inside ROBOTERM
@@ -76,6 +76,8 @@ Add to your `~/.bashrc` or `~/.zshrc`:
 Then use `rt` commands:
 ```
 rt init        — Auto-detect & source ROS2 workspace
+rt status      — One-line system status
+rt info        — Full environment details
 rt nodes       — Live node dashboard
 rt topics      — Topic monitor with types
 rt services    — Service list with types
@@ -89,6 +91,15 @@ rt echo        — Pretty topic echo
 rt launch      — Enhanced ros2 launch
 rt dds         — DDS configuration & diagnostics
 rt docker      — Docker helpers (ps, up, down, logs, shell)
+rt lifecycle   — Node lifecycle management (list, get, set)
+rt sensor      — Sensor monitoring (list, watch, hz, bw)
+rt ssh         — SSH to configured robots
+rt watch       — Watch multiple topics (--all for live dashboard)
+rt kill        — Kill a ROS2 node
+rt graph       — ASCII node connection graph
+rt profile     — Environment profiles (list, create, load, save)
+rt export      — Export to Foxglove (bag2csv, bag2mcap)
+rt alias       — Custom command shortcuts
 ```
 
 ### Status Bar
@@ -190,14 +201,27 @@ ROBOTERM is a **thin shell** over Ghostty's `GhosttyKit.xcframework`. We never m
 
 ## Roadmap
 
-- [ ] ROS2 node dashboard (live health monitoring)
-- [ ] Topic monitor (real-time Hz, bandwidth, message preview)
-- [ ] DDS inspector (domain topology)
-- [ ] TF2 debugging panel
-- [ ] Bag file management
-- [ ] Sensor visualization (inline camera/LiDAR preview)
-- [ ] SSH robot profiles
-- [ ] Foxglove export integration
+### Shipped (v0.1.0)
+- [x] Agent launcher bar (Claude Code + Codex)
+- [x] 60+ ROS2 commands in menus
+- [x] 25 `rt` CLI commands
+- [x] IOKit USB hotplug detection
+- [x] AppleScript support (SDEF + Cocoa scripting)
+- [x] Session persistence
+- [x] ROS2 workspace auto-detection
+- [x] Node dashboard, topic monitor, TF2 debugging
+- [x] DDS inspector, lifecycle management
+- [x] Bag management + Foxglove export
+- [x] Sensor monitoring, SSH robot profiles
+- [x] Environment profiles, custom aliases
+- [x] Right-click context menu with ROS2 actions
+
+### Next (v0.2.0)
+- [ ] Inline camera/LiDAR preview in terminal
+- [ ] ROS2 node graph visualization (TUI)
+- [ ] RosSwift integration (native pub/sub)
+- [ ] Bag timeline viewer
+- [ ] Recording indicator in status bar
 
 ## License
 
